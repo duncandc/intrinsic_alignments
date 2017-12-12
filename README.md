@@ -9,6 +9,7 @@ Possible avenues of research:
 * Repeat above exercise, but using shape-shape signal, which I suspect contains significantly more information relative to shape-pos. Forecast whether LSST statistics will be sufficient to beat down shape noise enough to exploit this information. 
 * Directly measure the one-point IA distributions using recently completed adiabatic hydro (using alignment between shape of gas vs. shape of halo or tidal field vector). This misses feedback physics, but just like with N-body sims there are zero free parameters, so the result is permanent, and is the definitive "baseline case" that feedback modulates. Can just use toy model CAM to paint luminosity and color. The most interesting thing to study is probably redshift evolution, which is highly uncertain in kitchen-sink hydro, but has no uncertainty in adiabatic case. 
 * Treat MBII as fiducial model, fit the one-point IA distributions and try to recover the two-point functions, and/or just try to fit the one- and two-points together. Since this is basically what Francois has already done using ML algorithm, this is probably more interesting if done in conjunction with the adiabatic study.
+* Investigate relationship between galaxy-halo misalignment angle and halo ellipticity. There is evidence from observations (e.g. Blazek 2011) that this more elliptical halos show more alignment. One possible probe of this is the relationship between ellipticity weighted and non-weighted statistics.
 
 Tools that will be needed:
 
