@@ -4,14 +4,15 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 from astropy.table import Table
+from astropy.utils.misc import NumpyRNGContext
 
 from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.nfw_profile import NFWProfile
 from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.kernels import unbiased_dimless_vrad_disp as unbiased_dimless_vrad_disp_kernel
 
-from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.nfw_phase_space import NFWPhaseSpace
+from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.nfw_phase_space import NFWPhaseSpace, _relative_positions_and_velocities, _sign_pbc
 from halotools.empirical_models.phase_space_models.analytic_models.monte_carlo_helpers import MonteCarloGalProf
 
-from halotools.empirical_models import model_defaults
+from .utils import *
 
 
 __author__ = ['Andrew Hearin', 'Duncan Campbell']
@@ -26,12 +27,12 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
     def __init__(self):
         r"""
         """
-        MonteCarloGalProf.__init__(self)
 
+        super(MonteCarloAnisotropicGalProf, self).__init__()
 
     def mc_unit_sphere(self, Npts, **kwargs):
-        r""" 
-        Returns Npts random points on the unit sphere.
+        r"""
+        Returns Npts anisotropically distributed points on the unit sphere.
 
         Parameters
         ----------
@@ -47,43 +48,147 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         x, y, z : array_like
             Length-Npts arrays of the coordinate positions.
         """
+
         seed = kwargs.get('seed', None)
 
-        table = kwargs['table']
+        if 'table' in kwargs:
+            table = kwargs['table']
+            try:
+                b_to_a = table['halo_b_to_a']
+            except KeyError:
+                b_to_a = 1.0
+            try:
+                c_to_a = table['halo_c_to_a']
+            except KeyError:
+                c_to_a = 1.0
+            try:
+                halo_axisA_x = table['halo_axisA_x']
+                halo_axisA_y = table['halo_axisA_y']
+                halo_axisA_z = table['halo_axisA_z']
+            except KeyError:
+                with NumpyRNGContext(seed):
+                    halo_axisA_x = np.random.random(len(table))*2-1
+                    halo_axisA_y = np.random.random(len(table))*2-1
+                    halo_axisA_z = np.random.random(len(table))*2-1
+        else:
+            try:
+                b_to_a = np.atleast_1d(kwargs['b_to_a'])
+            except KeyError:
+                b_to_a = 1.0
+            try:
+                c_to_a = np.atleast_1d(kwargs['c_to_a'])
+            except KeyError:
+                c_to_a = 1.0
+            try:
+                halo_axisA_x = np.atleast_1d(kwargs['halo_axisA_x'])
+                halo_axisA_y = np.atleast_1d(kwargs['halo_axisA_y'])
+                halo_axisA_z = np.atleast_1d(kwargs['halo_axisA_z'])
+            except KeyError:
+                with NumpyRNGContext(seed):
+                    halo_axisA_x = np.random.random(Npts)*2-1
+                    halo_axisA_y = np.random.random(Npts)*2-1
+                    halo_axisA_z = np.random.random(Npts)*2-1
 
-        npts = len(table)
         with NumpyRNGContext(seed):
             phi = np.random.uniform(0, 2*np.pi, Npts)
-            uran = np.random.rand(npts)
+            uran = np.random.rand(Npts)
 
-        d = DimrothWatson()
-        k = (1.0/table['halo_b_to_a']-1.0)
-        cos_t = d.isf(uran, k)
-
-        cos_t = d.isf(uran, k)
+        cos_t = uran
         sin_t = np.sqrt((1.-cos_t*cos_t))
 
-        x = sin_t * np.cos(phi)
-        y = sin_t * np.sin(phi)
+        c_to_b = c_to_a/b_to_a
+        x = (1.0/c_to_a)*sin_t * np.cos(phi)
+        y = (1.0/c_to_b)*sin_t * np.sin(phi)
         z = cos_t
 
+        # define z-axis as the major axis
         z_correlated_axes = np.vstack((x, y, z)).T
 
-        z_axes = np.tile((0, 0, 1), npts).reshape((npts, 3))
-        input_unit_vectors = np.vstack((table['halo_axisA_x'],
-                                        table['halo_axisA_y'],
-                                        table['halo_axisA_z'])).T
+        z_axes = np.tile((0, 0, 1), Npts).reshape((Npts, 3))
+        major_axes = np.vstack((halo_axisA_x, halo_axisA_y, halo_axisA_z)).T
 
-        angles = angles_between_list_of_vectors(z_axes, input_unit_vectors)
-        rotation_axes = vectors_normal_to_planes(z_axes, input_unit_vectors)
+        # rotate z-axis into the major axis
+        angles = angles_between_list_of_vectors(z_axes, major_axes)
+        rotation_axes = vectors_normal_to_planes(z_axes, major_axes)
         matrices = rotation_matrices_from_angles(angles, rotation_axes)
 
         correlated_axes = rotate_vector_collection(matrices, z_correlated_axes)
-        x, y, z = correlated_axes[:, 0], correlated_axes[:, 1], correlated_axes[:, 2]
+        return correlated_axes[:, 0], correlated_axes[:, 1], correlated_axes[:, 2]
+
+    def mc_solid_sphere(self, *profile_params, **kwargs):
+        r""" Method to generate random, three-dimensional, halo-centric positions of galaxies.
+
+        Parameters
+        ----------
+        *profile_params : Sequence of arrays
+            Sequence of length-Ngals array(s) containing the input profile parameter(s).
+            In the simplest case, this sequence has a single element,
+            e.g. a single array storing values of the NFW concentrations of the Ngals galaxies.
+            More generally, there should be a ``profile_params`` sequence item for
+            every parameter in the profile model, each item a length-Ngals array.
+            The sequence must have the same order as ``self.gal_prof_param_keys``.
+
+        table : data table, optional
+            Astropy Table storing a length-Ngals galaxy catalog.
+            If ``table`` is not passed, ``profile_params`` must be passed.
+
+        seed : int, optional
+            Random number seed used in the Monte Carlo realization.
+            Default is None, which will produce stochastic results.
+
+        Returns
+        -------
+        x, y, z : arrays
+            Length-Ngals array storing a Monte Carlo realization of the galaxy positions.
+
+        """
+
+        # Retrieve the list of profile_params
+        if 'table' in kwargs:
+            table = kwargs['table']
+            profile_params = ([table[profile_param_key]
+                for profile_param_key in self.gal_prof_param_keys])
+            halo_radius = table[self.halo_boundary_key]
+        else:
+            try:
+                assert len(profile_params) > 0
+            except AssertionError:
+                raise HalotoolsError("If not passing an input ``table`` "
+                    "keyword argument to mc_solid_sphere,\n"
+                    "must pass a ``profile_params`` keyword argument")
+
+        # get random angles
+        Ngals = len(np.atleast_1d(profile_params[0]))
+        if Ngals == 0:
+            return None, None, None
+
+        x, y, z = self.mc_unit_sphere(Ngals, **kwargs)
+
+        # Get the radial positions of the galaxies scaled by the halo radius
+        seed = kwargs.get('seed', None)
+        if seed is not None:
+            seed += 1
+        dimensionless_radial_distance = self._mc_dimensionless_radial_distance(*profile_params, seed=seed)
+
+        # get random positions within the solid sphere
+        x *= dimensionless_radial_distance
+        y *= dimensionless_radial_distance
+        z *= dimensionless_radial_distance
+
+        # Assign the value of the host_centric_distance table column
+        if 'table' in kwargs:
+            try:
+                table['host_centric_distance'][:] = dimensionless_radial_distance
+                table['host_centric_distance'][:] *= halo_radius
+            except KeyError:
+                msg = ("The mc_solid_sphere method of the MonteCarloGalProf class "
+                    "requires a table key ``host_centric_distance`` to be pre-allocated ")
+                raise HalotoolsError(msg)
+
         return x, y, z
 
 
-class AnisotropicNFWPhaseSpace(NFWPhaseSpace, MonteCarloAnisotropicGalProf):
+class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
     r"""
     sub-class of NFWPhaseSpace
     """
@@ -130,8 +235,100 @@ class AnisotropicNFWPhaseSpace(NFWPhaseSpace, MonteCarloAnisotropicGalProf):
         >>> model = AnisotropicNFWPhaseSpace()
         """
 
-        NFWPhaseSpace.__init__(self, **kwargs)
-        AnisotropicMonteCarloGalProf.__init__(self)
-        self.list_of_haloprops_needed = ['halo_b_to_a']
+        super(AnisotropicNFWPhaseSpace, self).__init__(**kwargs)
+        self.list_of_haloprops_needed = ['halo_b_to_a', 'halo_c_to_a', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
 
+    def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4), conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
+            verbose=True, seed=None):
+        r""" Return a Monte Carlo realization of points
+        in the phase space of an NFW halo in isotropic Jeans equilibrium.
 
+        Parameters
+        -----------
+        Ngals : int, optional
+            Number of galaxies in the Monte Carlo realization of the
+            phase space distribution. Default is 1e4.
+
+        conc : float, optional
+            Concentration of the NFW profile being realized.
+            Default is 5.
+
+        mass : float, optional
+            Mass of the halo whose phase space distribution is being realized
+            in units of Msun/h. Default is 1e12.
+
+        verbose : bool, optional
+            If True, a message prints with an estimate of the build time.
+            Default is True.
+
+        seed : int, optional
+            Random number seed used in the Monte Carlo realization.
+            Default is None, which will produce stochastic results.
+
+        Returns
+        --------
+        t : table
+            `~astropy.table.Table` containing the Monte Carlo realization of the
+            phase space distribution.
+            Keys are 'x', 'y', 'z', 'vx', 'vy', 'vz', 'radial_position', 'radial_velocity'.
+            Length units in Mpc/h, velocity units in km/s.
+
+        Examples
+        ---------
+        >>> nfw = AnisotropicNFWPhaseSpace()
+        >>> mass, conc, b_to_a, c_to_a = 1e13, 8., 0.9, 0.6
+        >>> data = nfw.mc_generate_nfw_phase_space_points(Ngals=100, mass=mass, conc=conc, b_to_a=b_to_a, c_to_a=c_to_a, verbose=False)
+
+        Now suppose you wish to compute the radial velocity dispersion of all the returned points:
+
+        >>> vrad_disp = np.std(data['radial_velocity'])
+
+        If you wish to do the same calculation but for points in a specific range of radius:
+
+        >>> mask = data['radial_position'] < 0.1
+        >>> vrad_disp_inner_points = np.std(data['radial_velocity'][mask])
+
+        You may also wish to select points according to their distance to the halo center
+        in units of the virial radius. In such as case, you can use the
+        `~halotools.empirical_models.NFWPhaseSpace.halo_mass_to_halo_radius`
+        method to scale the halo-centric distances. Here is an example
+        of how to compute the velocity dispersion in the z-dimension of all points
+        residing within :math:`R_{\rm vir}/2`:
+
+        >>> halo_radius = nfw.halo_mass_to_halo_radius(mass)
+        >>> scaled_radial_positions = data['radial_position']/halo_radius
+        >>> mask = scaled_radial_positions < 0.5
+        >>> vz_disp_inner_half = np.std(data['vz'][mask])
+
+        """
+
+        m = np.zeros(Ngals) + mass
+        c = np.zeros(Ngals) + conc
+        rvir = NFWProfile.halo_mass_to_halo_radius(self, total_mass=m)
+
+        x, y, z = self.mc_halo_centric_pos(c,
+            halo_radius=rvir, b_to_a=b_to_a, c_to_a=c_to_a, seed=seed)
+        r = np.sqrt(x**2 + y**2 + z**2)
+        scaled_radius = r/rvir
+
+        if seed is not None:
+            seed += 1
+        vx = self.mc_radial_velocity(scaled_radius, m, c, seed=seed)
+        if seed is not None:
+            seed += 1
+        vy = self.mc_radial_velocity(scaled_radius, m, c, seed=seed)
+        if seed is not None:
+            seed += 1
+        vz = self.mc_radial_velocity(scaled_radius, m, c, seed=seed)
+
+        xrel, vxrel = _relative_positions_and_velocities(x, 0, v1=vx, v2=0)
+        yrel, vyrel = _relative_positions_and_velocities(y, 0, v1=vy, v2=0)
+        zrel, vzrel = _relative_positions_and_velocities(z, 0, v1=vz, v2=0)
+
+        vrad = (xrel*vxrel + yrel*vyrel + zrel*vzrel)/r
+
+        t = Table({'x': x, 'y': y, 'z': z,
+            'vx': vx, 'vy': vy, 'vz': vz,
+            'radial_position': r, 'radial_velocity': vrad})
+
+        return t
