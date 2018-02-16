@@ -162,13 +162,14 @@ class DimrothWatson(rv_continuous):
         r"""
         caclulate normalization constant
         """
-        #f = lambda t: 2.0*np.exp(k*t**2)
-        #norm = 1.0/quad(f, 0, 1)[0]
         k = np.fabs(k)
         norm = 4.0*np.sqrt(np.pi)*erf(np.sqrt(k))/(4.0*np.sqrt(k))
-        return np.where(k==0, 0.5, 1.0/norm)
+        return np.where(k == 0, 0.5, 1.0/norm)
 
     def _pdf(self, x, k):
+        r"""
+        probability distribution function
+        """
         norm = self._norm(k)
         p = norm*np.exp(-1.0*k*x**2)
         return p
@@ -180,7 +181,7 @@ class DimrothWatson(rv_continuous):
         k = np.fabs(k)
         norm = self._norm(k)
         result = np.sqrt(np.pi)*(erf(x*np.sqrt(k))+erf(np.sqrt(k)))/(4*np.sqrt(k))
-        return np.where(k==0, 0.5*x+0.5, 2*norm*result)
+        return np.where(k == 0, 0.5*x+0.5, 2*norm*result)
 
 
 def alignment_strenth(p):
