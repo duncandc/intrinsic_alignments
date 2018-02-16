@@ -8,6 +8,7 @@ from .utils import *
 from scipy.stats import rv_continuous
 from scipy.integrate import quad
 from astropy.utils.misc import NumpyRNGContext
+from scipy.special import erf, erfi
 
 
 __all__ = ('axes_correlated_with_input_vector',)
@@ -149,7 +150,7 @@ class DimrothWatson(rv_continuous):
     distribution of :math:`\cos(\theta)' in a  Dimroth-Watson distribution
     """
     def _argcheck(self, k):
-        """
+        r"""
         check arguments
         """
         k = np.asarray(k)
@@ -158,17 +159,28 @@ class DimrothWatson(rv_continuous):
         return (k == k)
 
     def _norm(self, k):
-        """
+        r"""
         caclulate normalization constant
         """
-        f = lambda t: 2.0*np.exp(k*t**2)
-        norm = 1.0/quad(f, 0, 1)[0]
-        return norm
+        #f = lambda t: 2.0*np.exp(k*t**2)
+        #norm = 1.0/quad(f, 0, 1)[0]
+        k = np.fabs(k)
+        norm = 4.0*np.sqrt(np.pi)*erf(np.sqrt(k))/(4.0*np.sqrt(k))
+        return np.where(k==0, 0.5, 1.0/norm)
 
     def _pdf(self, x, k):
         norm = self._norm(k)
-        p = norm*np.exp(k*x**2)
+        p = norm*np.exp(-1.0*k*x**2)
         return p
+
+    def _cdf(self, x, k):
+        r"""
+        cumulative distribution function
+        """
+        k = np.fabs(k)
+        norm = self._norm(k)
+        result = np.sqrt(np.pi)*(erf(x*np.sqrt(k))+erf(np.sqrt(k)))/(4*np.sqrt(k))
+        return np.where(k==0, 0.5*x+0.5, 2*norm*result)
 
 
 def alignment_strenth(p):
