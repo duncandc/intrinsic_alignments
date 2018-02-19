@@ -8,7 +8,7 @@ from .utils import *
 from scipy.stats import rv_continuous
 from scipy.integrate import quad
 from astropy.utils.misc import NumpyRNGContext
-from scipy.special import erf, erfi
+from scipy.special import erf, erfi, erfinv
 
 
 __all__ = ('axes_correlated_with_input_vector',)
@@ -162,9 +162,25 @@ class DimrothWatson(rv_continuous):
         r"""
         caclulate normalization constant
         """
+
+        # mask for positive and negative k cases
+        negative_k = (k < 0) & (k != 0)
+        non_zero_k = (k != 0)
+
+        # now ignore sign of k
         k = np.fabs(k)
-        norm = 4.0*np.sqrt(np.pi)*erf(np.sqrt(k))/(4.0*np.sqrt(k))
-        return np.where(k == 0, 0.5, 1.0/norm)
+
+        # array to store result
+        norm = np.zeros(len(k))
+
+        # for k>0
+        norm[non_zero_k] = 4.0*np.sqrt(np.pi)*erf(np.sqrt(k[non_zero_k]))/(4.0*np.sqrt(k[non_zero_k]))
+        # for k<0
+        norm[negative_k] = 4.0*np.sqrt(np.pi)*erfi(np.sqrt(k[negative_k]))/(4.0*np.sqrt(k[negative_k]))
+
+        # ignore divide by zero in the where statement
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return np.where(k == 0, 0.5, 1.0/norm)
 
     def _pdf(self, x, k):
         r"""
@@ -178,10 +194,126 @@ class DimrothWatson(rv_continuous):
         r"""
         cumulative distribution function
         """
-        k = np.fabs(k)
+
+        x = np.atleast_1d(x)
+        k = np.atleast_1d(k)
+        size = len(x)
+        k = np.atleast_1d(k)
+        if len(k) == 1:
+             k = np.ones(size)*k
+        elif len(k) == size:
+            pass
+        else:
+            msg = ('len(k) must be 1 or equal to len(x).')
+            raise ValueError(msg)
+
+        # mask for positive and negative k cases
+        negative_k = (k < 0) & (k != 0)
+        non_zero_k = (k != 0)
+
         norm = self._norm(k)
-        result = np.sqrt(np.pi)*(erf(x*np.sqrt(k))+erf(np.sqrt(k)))/(4*np.sqrt(k))
-        return np.where(k == 0, 0.5*x+0.5, 2*norm*result)
+
+        k = np.fabs(k)
+
+        # array to store result
+        result = np.zeros(len(k))
+        result[non_zero_k] = np.sqrt(np.pi)*( erf(x[non_zero_k]*np.sqrt(k[non_zero_k]))+ erf(np.sqrt(k[non_zero_k])))/(4*np.sqrt(k[non_zero_k]))
+        result[negative_k] = np.sqrt(np.pi)*(erfi(x[negative_k]*np.sqrt(k[negative_k]))+erfi(np.sqrt(k[negative_k])))/(4*np.sqrt(k[negative_k]))
+
+        return np.where(k == 0, 0.5*x+0.5, 2.0*norm*result)
+
+    def _isf(self, y, k):
+        r"""
+        inverse survival function
+        """
+
+        y = np.atleast_1d(y)
+        size = len(y)
+        k = np.atleast_1d(k)
+        if len(k) == 1:
+             k = np.ones(size)*k
+        elif len(k) == size:
+            pass
+        else:
+            msg = ('len(k) must be 1 or equal to len(y).')
+            raise ValueError(msg)
+
+        # mask for positive and negative k cases
+        negative_k = (k < 0) & (k != 0)
+        non_zero_k = (k != 0)
+
+        norm = self._norm(k)
+        k = np.fabs(k)
+
+        # array to store result
+        result = np.zeros(len(k))
+
+        # for k>0
+        kk = k[non_zero_k]
+        yy = y[non_zero_k]
+        nnorm = norm[non_zero_k]
+        inv_arg = ((4*np.sqrt(kk)*yy/(np.sqrt(np.pi)*2.0*nnorm)) - erf(np.sqrt(kk)))
+        result[non_zero_k] = erfinv(inv_arg)/np.sqrt(kk)
+        # for k<0
+        kk = k[negative_k]
+        yy = y[negative_k]
+        nnorm = norm[negative_k]
+        inv_arg = ((4*np.sqrt(kk)*yy/(np.sqrt(np.pi)*2.0*nnorm)) - erfi(np.sqrt(kk)))
+        result[negative_k] = erfiinv(inv_arg)/np.sqrt(kk)
+
+        return np.where(k == 0, (y-0.5)/0.5, result)
+
+    def _rvs(self, k, size=1, seed=None):
+        r"""
+        random variates
+        """
+
+        k = np.atleast_1d(k)
+        if size != 1:
+            if len(k) == size:
+                pass
+            elif len(k) == 1:
+                k = np.ones(size)*k
+            else:
+                msg = ('if `size` argument is given, len(k) must be 1 or equal to size.')
+                raise ValueError(msg)
+        else:
+            size = len(k)
+
+        with NumpyRNGContext(seed):
+            uran = np.random.random(size)
+
+        return self._isf(uran, k)
+
+
+def erfiinv(y, kmax=100):
+    r"""
+    inverse imaginary error function for y close to zero
+    """
+
+    c = np.zeros(kmax)
+    c[0] = 1.0
+    c[1] = 1.0
+    result = 0.0
+    for k in range(0, kmax):
+        # Calculate C sub k
+        if k > 1:
+            c[k] = 0.0
+            for m in range(0, k):
+                term = (c[m]*c[k - 1 - m])/((m + 1.0)*(2.0*m + 1.0))
+                c[k] += term
+        result += ((-1.0)**k*c[k]/(2.0*k + 1))*((np.sqrt(np.pi)/2)*y)**(2.0*k + 1)
+    return result
+
+
+def approx_erf(x):
+    a = 8.0*(np.pi-3)/(3.0*np.pi*(4.0-np.pi))
+    return np.sign(x)*np.sqrt(1.0-np.exp(-1.0*x**2*(4.0/np.pi+a*x**2)/(1+a*x**2)))
+
+
+def approx_erfinv(x):
+    a = 8.0*(np.pi-3)/(3.0*np.pi*(4.0-np.pi))
+    return np.sign(x)*np.sqrt(np.sqrt((2.0/(np.pi*a)+np.log(1.0-x**2)/2)**2-np.log(1.0-x**2)/a)-(2/(np.pi*a)+np.log(1.0-x**2)/2.0))
 
 
 def alignment_strenth(p):
