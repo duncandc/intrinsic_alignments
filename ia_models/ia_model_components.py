@@ -289,22 +289,33 @@ class DimrothWatson(rv_continuous):
             kk = k
             mask = np.array([False]*size)
             while n_sucess<size:
+                # get two uniform random numbers
                 uran1 = np.random.random(n_remaining)
                 uran2 = np.random.random(n_remaining)
                 
                 negative_k = (kk < 0)
                 positive_k = (kk > 0)
                 
-                y1 = np.zeros(n_remaining)
-                y1[positive_k] = self.g1(uran1[positive_k], kk[positive_k])
-                y1[negative_k] = self.g2(uran1[negative_k], kk[negative_k])
-                y2 = self.pdf(uran1, kk)
+                # calculate M*g(y) 
+                g_y = np.zeros(n_remaining)
+                m = np.zeros(n_remaining)
+                g_y[positive_k] = self.g1(uran1[positive_k], kk[positive_k])
+                g_y[negative_k] = self.g2(uran1[negative_k], kk[negative_k])
+                m[positive_k] = self.m1(kk[positive_k])
+                m[negative_k] = self.m2(kk[negative_k])
                 
-                keep = (y2/y1)>uran2
+                # sample from g to get y
+                y = self.g2_isf(uran1[negative_k], kk[negative_k])
+                # sample from f to f(y)
+                f_y = self.pdf(y, kk)
                 
+                # accept or reject y
+                keep = ((f_y/(g_y*m))<uran2)
+                
+                # count the number of succesful samplings
                 n_sucess += np.sum(keep)
 
-                result[~mask] = self.g2_isf(uran1[negative_k], kk[negative_k])
+                result[~mask] = y
                 mask[~mask] = keep
 
                 n_cycles += 1
@@ -327,14 +338,33 @@ class DimrothWatson(rv_continuous):
         C = eta/(np.arctan(eta))
         return (C/(1+eta**2*x**2))
 
-    def g2_isf(self, x, k):
+    def g2_cdf(self, x, k):
         r"""
         survival function of g2
         """
         k = -1.0*k
         C = k/(np.exp(k)-1.0)
-        norm = (1.0/k)*np.log(1.0/C+1.0)
-        return (1.0/k)*np.log(x/C+1.0)/norm
+        return C*(np.exp(k*x)-1)/k
+
+    def g2_isf(self, y, k):
+        k = -1.0*k
+        C = k/(np.exp(k)-1.0)
+        return np.log(k*y/C+1)/k
+
+    def g2_pdf(self, x, k):
+        r"""
+        an upper envelope function for k<0
+        """
+        k = -1*k
+        norm = 2.0*(k*np.exp(k)-k)
+        return (np.exp(k*np.fabs(x)))/norm
+    
+    def m2(self, k):
+        """
+        factor for g2 dist
+        """
+        C = k*(np.exp(k)-1)**(-1)
+        return C
 
     def g2(self, x, k):
         r"""
@@ -342,7 +372,8 @@ class DimrothWatson(rv_continuous):
         """
         k = -1*k
         C = k*(np.exp(k)-1)**(-1)
-        return (C*np.exp(k*x))
+        norm = (np.exp(k)-1)/k
+        return (C*np.exp(k*np.fabs(x)))
 
 
 def erfiinv(y, kmax=100):
