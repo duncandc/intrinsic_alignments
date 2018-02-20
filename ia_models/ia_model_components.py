@@ -147,7 +147,7 @@ class SatelliteAlignment(object):
 
 class DimrothWatson(rv_continuous):
     r"""
-    distribution of :math:`\cos(\theta)' in a  Dimroth-Watson distribution
+    distribution of :math:`\cos(\theta)' for a  Dimroth-Watson distribution
     """
     def _argcheck(self, k):
         r"""
@@ -279,11 +279,70 @@ class DimrothWatson(rv_continuous):
                 raise ValueError(msg)
         else:
             size = len(k)
-
+        
+        result = np.zeros(size)
         with NumpyRNGContext(seed):
-            uran = np.random.random(size)
+            n_sucess = 0
+            n_remaining = size
+            i_start = 0
+            n_cycles = 0
+            kk = k
+            mask = np.array([False]*size)
+            while n_sucess<size:
+                uran1 = np.random.random(n_remaining)
+                uran2 = np.random.random(n_remaining)
+                
+                negative_k = (kk < 0)
+                positive_k = (kk > 0)
+                
+                y1 = np.zeros(n_remaining)
+                y1[positive_k] = self.g1(uran1[positive_k], kk[positive_k])
+                y1[negative_k] = self.g2(uran1[negative_k], kk[negative_k])
+                y2 = self.pdf(uran1, kk)
+                
+                keep = (y2/y1)>uran2
+                
+                n_sucess += np.sum(keep)
 
-        return self._isf(uran, k)
+                result[~mask] = self.g2_isf(uran1[negative_k], kk[negative_k])
+                mask[~mask] = keep
+
+                n_cycles += 1
+                n_remaining = np.sum(~keep)
+                kk = kk[~keep]
+        
+        with NumpyRNGContext(seed):
+            ran = np.random.random(size)
+            one_or_minus_one = np.ones(size)
+            one_or_minus_one[ran<0.5] = -1
+
+        return result*one_or_minus_one
+
+    def g1(self, x, k):
+        r"""
+        an upper envelope function for k>0
+        """
+        k = -1*k
+        eta = np.sqrt(-1*k)
+        C = eta/(np.arctan(eta))
+        return (C/(1+eta**2*x**2))
+
+    def g2_isf(self, x, k):
+        r"""
+        survival function of g2
+        """
+        k = -1.0*k
+        C = k/(np.exp(k)-1.0)
+        norm = (1.0/k)*np.log(1.0/C+1.0)
+        return (1.0/k)*np.log(x/C+1.0)/norm
+
+    def g2(self, x, k):
+        r"""
+        an upper envelope function for k<0
+        """
+        k = -1*k
+        C = k*(np.exp(k)-1)**(-1)
+        return (C*np.exp(k*x))
 
 
 def erfiinv(y, kmax=100):
@@ -304,16 +363,6 @@ def erfiinv(y, kmax=100):
                 c[k] += term
         result += ((-1.0)**k*c[k]/(2.0*k + 1))*((np.sqrt(np.pi)/2)*y)**(2.0*k + 1)
     return result
-
-
-def approx_erf(x):
-    a = 8.0*(np.pi-3)/(3.0*np.pi*(4.0-np.pi))
-    return np.sign(x)*np.sqrt(1.0-np.exp(-1.0*x**2*(4.0/np.pi+a*x**2)/(1+a*x**2)))
-
-
-def approx_erfinv(x):
-    a = 8.0*(np.pi-3)/(3.0*np.pi*(4.0-np.pi))
-    return np.sign(x)*np.sqrt(np.sqrt((2.0/(np.pi*a)+np.log(1.0-x**2)/2)**2-np.log(1.0-x**2)/a)-(2/(np.pi*a)+np.log(1.0-x**2)/2.0))
 
 
 def alignment_strenth(p):
