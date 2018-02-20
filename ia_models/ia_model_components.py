@@ -279,55 +279,61 @@ class DimrothWatson(rv_continuous):
                 raise ValueError(msg)
         else:
             size = len(k)
-        
+
+        # apply rejection sampling technique to sample from pdf
         result = np.zeros(size)
         with NumpyRNGContext(seed):
-            n_sucess = 0
-            n_remaining = size
-            i_start = 0
-            n_cycles = 0
-            kk = k
-            mask = np.array([False]*size)
-            while n_sucess<size:
-                # get two uniform random numbers
+            n_sucess = 0  # number of sucesessful draws from pdf
+            n_remaining = size  # remaining draws necessary
+            n_iter = 0  # number of sample-rejhect iterations
+            kk = k  # store subset of k values that still need to be sampled
+            mask = np.array([False]*size)  # mask indicating which k values have a sucessful sample
+            while n_sucess < size:
+                # get three uniform random numbers
                 uran1 = np.random.random(n_remaining)
                 uran2 = np.random.random(n_remaining)
-                
+                uran3 = np.random.random(n_remaining)
+
+                # masks indicating which envelope function is used
                 negative_k = (kk < 0)
                 positive_k = (kk > 0)
-                
-                # calculate M*g(y) 
+
+                # sample from g(x) to get y
+                y = np.zeros(n_remaining)
+                y[positive_k] = self.g1_isf(uran1[positive_k], kk[positive_k])
+                y[negative_k] = self.g2_isf(uran1[negative_k], kk[negative_k])
+                y[uran3 < 0.5] = -1.0*y[uran3 < 0.5]  # account for one-sided isf function
+
+                # calculate M*g(y)
                 g_y = np.zeros(n_remaining)
                 m = np.zeros(n_remaining)
-                g_y[positive_k] = self.g1(uran1[positive_k], kk[positive_k])
-                g_y[negative_k] = self.g2(uran1[negative_k], kk[negative_k])
+                g_y[positive_k] = self.g1_pdf(y[positive_k], kk[positive_k])
+                g_y[negative_k] = self.g2_pdf(y[negative_k], kk[negative_k])
                 m[positive_k] = self.m1(kk[positive_k])
                 m[negative_k] = self.m2(kk[negative_k])
-                
-                # sample from g to get y
-                y = self.g2_isf(uran1[negative_k], kk[negative_k])
-                # sample from f to f(y)
+
+                # calulate f(y)
                 f_y = self.pdf(y, kk)
-                
+
                 # accept or reject y
-                keep = ((f_y/(g_y*m))<uran2)
-                
-                # count the number of succesful samplings
+                keep = ((f_y/(g_y*m)) > uran2)
+
+                # count the number of succesful samples
                 n_sucess += np.sum(keep)
 
+                #store y values
                 result[~mask] = y
+
+                # update mask indicating which values need to be redrawn
                 mask[~mask] = keep
 
-                n_cycles += 1
-                n_remaining = np.sum(~keep)
+                # get subset of k values which need to be sampled.
                 kk = kk[~keep]
-        
-        with NumpyRNGContext(seed):
-            ran = np.random.random(size)
-            one_or_minus_one = np.ones(size)
-            one_or_minus_one[ran<0.5] = -1
 
-        return result*one_or_minus_one
+                n_iter += 1
+                n_remaining = np.sum(~keep)
+
+        return result
 
     def g1(self, x, k):
         r"""
@@ -338,42 +344,53 @@ class DimrothWatson(rv_continuous):
         C = eta/(np.arctan(eta))
         return (C/(1+eta**2*x**2))
 
-    def g2_cdf(self, x, k):
+    def g1_pdf(self, x, k):
         r"""
-        survival function of g2
+        proposal distribution for pdf for k>0
         """
-        k = -1.0*k
-        C = k/(np.exp(k)-1.0)
-        return C*(np.exp(k*x)-1)/k
+        k = -1*k
+        eta = np.sqrt(-1*k)
+        C = eta/(np.arctan(eta))
+        return (C/(1+eta**2*x**2))/2.0
+
+    def g1_isf(self, y, k):
+        r"""
+        an upper envelope function for k>0
+        """
+        k = -1*k
+        eta = np.sqrt(-1*k)
+        return (1.0/eta)*(np.tan(y*np.arctan(eta)))
+
+    def m1(self, k):
+        r"""
+        eneveloping factor for proposal distribution for pdf for k>0
+        """
+        return 2.0*np.ones(len(k))
+
+    def g2_pdf(self, x, k):
+        r"""
+        proposal distribution for pdf for k<0
+        """
+        k = -1*k
+        norm = 2.0*(np.exp(k)-1)/k
+        return (np.exp(k*np.fabs(x)))/norm
 
     def g2_isf(self, y, k):
+        r"""
+        inverse survival function of proposal distribution for pdf for k<0
+        """
         k = -1.0*k
         C = k/(np.exp(k)-1.0)
         return np.log(k*y/C+1)/k
 
-    def g2_pdf(self, x, k):
-        r"""
-        an upper envelope function for k<0
-        """
-        k = -1*k
-        norm = 2.0*(k*np.exp(k)-k)
-        return (np.exp(k*np.fabs(x)))/norm
-    
     def m2(self, k):
-        """
-        factor for g2 dist
-        """
-        C = k*(np.exp(k)-1)**(-1)
-        return C
-
-    def g2(self, x, k):
         r"""
-        an upper envelope function for k<0
+        eneveloping factor for proposal distribution for pdf for k<0
         """
-        k = -1*k
+        k = -1.0*k
         C = k*(np.exp(k)-1)**(-1)
-        norm = (np.exp(k)-1)/k
-        return (C*np.exp(k*np.fabs(x)))
+        norm = 2.0*(np.exp(k)-1)/k
+        return C*norm
 
 
 def erfiinv(y, kmax=100):
