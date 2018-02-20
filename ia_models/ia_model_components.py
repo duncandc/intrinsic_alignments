@@ -163,6 +163,8 @@ class DimrothWatson(rv_continuous):
         caclulate normalization constant
         """
 
+        k = np.atleast_1d(k)
+
         # mask for positive and negative k cases
         negative_k = (k < 0) & (k != 0)
         non_zero_k = (k != 0)
@@ -195,18 +197,6 @@ class DimrothWatson(rv_continuous):
         cumulative distribution function
         """
 
-        x = np.atleast_1d(x)
-        k = np.atleast_1d(k)
-        size = len(x)
-        k = np.atleast_1d(k)
-        if len(k) == 1:
-             k = np.ones(size)*k
-        elif len(k) == size:
-            pass
-        else:
-            msg = ('len(k) must be 1 or equal to len(x).')
-            raise ValueError(msg)
-
         # mask for positive and negative k cases
         negative_k = (k < 0) & (k != 0)
         non_zero_k = (k != 0)
@@ -217,58 +207,18 @@ class DimrothWatson(rv_continuous):
 
         # array to store result
         result = np.zeros(len(k))
-        result[non_zero_k] = np.sqrt(np.pi)*( erf(x[non_zero_k]*np.sqrt(k[non_zero_k]))+ erf(np.sqrt(k[non_zero_k])))/(4*np.sqrt(k[non_zero_k]))
+        result[non_zero_k] = np.sqrt(np.pi)*(erf(x[non_zero_k]*np.sqrt(k[non_zero_k]))+erf(np.sqrt(k[non_zero_k])))/(4*np.sqrt(k[non_zero_k]))
         result[negative_k] = np.sqrt(np.pi)*(erfi(x[negative_k]*np.sqrt(k[negative_k]))+erfi(np.sqrt(k[negative_k])))/(4*np.sqrt(k[negative_k]))
 
         return np.where(k == 0, 0.5*x+0.5, 2.0*norm*result)
 
-    def _isf(self, y, k):
-        r"""
-        inverse survival function
-        """
-
-        y = np.atleast_1d(y)
-        size = len(y)
-        k = np.atleast_1d(k)
-        if len(k) == 1:
-             k = np.ones(size)*k
-        elif len(k) == size:
-            pass
-        else:
-            msg = ('len(k) must be 1 or equal to len(y).')
-            raise ValueError(msg)
-
-        # mask for positive and negative k cases
-        negative_k = (k < 0) & (k != 0)
-        non_zero_k = (k != 0)
-
-        norm = self._norm(k)
-        k = np.fabs(k)
-
-        # array to store result
-        result = np.zeros(len(k))
-
-        # for k>0
-        kk = k[non_zero_k]
-        yy = y[non_zero_k]
-        nnorm = norm[non_zero_k]
-        inv_arg = ((4*np.sqrt(kk)*yy/(np.sqrt(np.pi)*2.0*nnorm)) - erf(np.sqrt(kk)))
-        result[non_zero_k] = erfinv(inv_arg)/np.sqrt(kk)
-        # for k<0
-        kk = k[negative_k]
-        yy = y[negative_k]
-        nnorm = norm[negative_k]
-        inv_arg = ((4*np.sqrt(kk)*yy/(np.sqrt(np.pi)*2.0*nnorm)) - erfi(np.sqrt(kk)))
-        result[negative_k] = erfiinv(inv_arg)/np.sqrt(kk)
-
-        return np.where(k == 0, (y-0.5)/0.5, result)
-
-    def _rvs(self, k, size=1, seed=None):
+    def _rvs(self, k):
         r"""
         random variates
         """
 
         k = np.atleast_1d(k)
+        size = self._size[0]
         if size != 1:
             if len(k) == size:
                 pass
@@ -280,58 +230,64 @@ class DimrothWatson(rv_continuous):
         else:
             size = len(k)
 
-        # apply rejection sampling technique to sample from pdf
         result = np.zeros(size)
-        with NumpyRNGContext(seed):
-            n_sucess = 0  # number of sucesessful draws from pdf
-            n_remaining = size  # remaining draws necessary
-            n_iter = 0  # number of sample-rejhect iterations
-            kk = k  # store subset of k values that still need to be sampled
-            mask = np.array([False]*size)  # mask indicating which k values have a sucessful sample
-            while n_sucess < size:
-                # get three uniform random numbers
-                uran1 = np.random.random(n_remaining)
-                uran2 = np.random.random(n_remaining)
-                uran3 = np.random.random(n_remaining)
 
-                # masks indicating which envelope function is used
-                negative_k = (kk < 0)
-                positive_k = (kk > 0)
+        # take care of k=0 case
+        zero_k = (k == 0)
+        uran0 = np.random.random(np.sum(zero_k))*2 - 1.0
+        result[zero_k] = uran0
 
-                # sample from g(x) to get y
-                y = np.zeros(n_remaining)
-                y[positive_k] = self.g1_isf(uran1[positive_k], kk[positive_k])
-                y[negative_k] = self.g2_isf(uran1[negative_k], kk[negative_k])
-                y[uran3 < 0.5] = -1.0*y[uran3 < 0.5]  # account for one-sided isf function
+        # apply rejection sampling technique to sample from pdf
+        n_sucess = np.sum(zero_k)  # number of sucesessful draws from pdf
+        n_remaining = size - np.sum(zero_k)  # remaining draws necessary
+        n_iter = 0  # number of sample-rejhect iterations
+        kk = k[~zero_k]  # store subset of k values that still need to be sampled
+        mask = np.array([False]*size)  # mask indicating which k values have a sucessful sample
+        mask[zero_k] = True
+        while n_sucess < size:
+            # get three uniform random numbers
+            uran1 = np.random.random(n_remaining)
+            uran2 = np.random.random(n_remaining)
+            uran3 = np.random.random(n_remaining)
 
-                # calculate M*g(y)
-                g_y = np.zeros(n_remaining)
-                m = np.zeros(n_remaining)
-                g_y[positive_k] = self.g1_pdf(y[positive_k], kk[positive_k])
-                g_y[negative_k] = self.g2_pdf(y[negative_k], kk[negative_k])
-                m[positive_k] = self.m1(kk[positive_k])
-                m[negative_k] = self.m2(kk[negative_k])
+            # masks indicating which envelope function is used
+            negative_k = (kk < 0.0)
+            positive_k = (kk > 0.0)
 
-                # calulate f(y)
-                f_y = self.pdf(y, kk)
+            # sample from g(x) to get y
+            y = np.zeros(n_remaining)
+            y[positive_k] = self.g1_isf(uran1[positive_k], kk[positive_k])
+            y[negative_k] = self.g2_isf(uran1[negative_k], kk[negative_k])
+            y[uran3 < 0.5] = -1.0*y[uran3 < 0.5]  # account for one-sided isf function
 
-                # accept or reject y
-                keep = ((f_y/(g_y*m)) > uran2)
+            # calculate M*g(y)
+            g_y = np.zeros(n_remaining)
+            m = np.zeros(n_remaining)
+            g_y[positive_k] = self.g1_pdf(y[positive_k], kk[positive_k])
+            g_y[negative_k] = self.g2_pdf(y[negative_k], kk[negative_k])
+            m[positive_k] = self.m1(kk[positive_k])
+            m[negative_k] = self.m2(kk[negative_k])
 
-                # count the number of succesful samples
-                n_sucess += np.sum(keep)
+            # calulate f(y)
+            f_y = self.pdf(y, kk)
 
-                #store y values
-                result[~mask] = y
+            # accept or reject y
+            keep = ((f_y/(g_y*m)) > uran2)
 
-                # update mask indicating which values need to be redrawn
-                mask[~mask] = keep
+            # count the number of succesful samples
+            n_sucess += np.sum(keep)
 
-                # get subset of k values which need to be sampled.
-                kk = kk[~keep]
+            #store y values
+            result[~mask] = y
 
-                n_iter += 1
-                n_remaining = np.sum(~keep)
+            # update mask indicating which values need to be redrawn
+            mask[~mask] = keep
+
+            # get subset of k values which need to be sampled.
+            kk = kk[~keep]
+
+            n_iter += 1
+            n_remaining = np.sum(~keep)
 
         return result
 
