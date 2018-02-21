@@ -595,7 +595,6 @@ def axes_correlated_with_z(p, seed=None):
 
     with NumpyRNGContext(seed):
         phi = np.random.uniform(0, 2*np.pi, npts)
-
         # sample cosine theta nonuniformily to correlate with in z-axis
         if np.all(p == 0):
             uran = np.random.uniform(0, 1, npts)
