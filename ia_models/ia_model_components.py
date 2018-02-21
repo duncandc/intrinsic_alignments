@@ -1,17 +1,17 @@
-""" Numpy kernels for modeling intrinsic alignments
+r"""
+Numpy kernels for modeling intrinsic alignments
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
-from .utils import *
+from .utils import random_perpendicular_directions, vectors_normal_to_planes, angles_between_list_of_vectors,\
+    rotation_matrices_from_angles, rotate_vector_collection, normalized_vectors
 from scipy.stats import rv_continuous
-from scipy.integrate import quad
-from astropy.utils.misc import NumpyRNGContext
 from scipy.special import erf, erfi, erfinv
 
 
-__all__ = ('axes_correlated_with_input_vector',)
+__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
@@ -19,7 +19,13 @@ class CentralAlignment(object):
     r"""
     alignment model for central galaxies
     """
-    def __init__(self, alignment_stregth=0):
+    def __init__(self, central_alignment_stregth=0):
+        r"""
+        Parameters
+        ----------
+        alignment_stregth : float
+            [-1,1] bounded number indicating alignment strength
+        """
 
         self.gal_type = 'centrals'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -34,12 +40,17 @@ class CentralAlignment(object):
         self._methods_to_inherit = (
             ['assign_orientation'])
         self.param_dict = ({
-            'alignment_strenth': alignment_stregth})
+            'central_alignment_strenth': central_alignment_stregth})
 
     def assign_orientation(self, **kwargs):
         r"""
         assign a a set of three orthoganl unit vectors indicating the orientation
         of the galaxies' major, intermediate, and minor axis
+
+        Parameters
+        ----------
+        halo_axisA_x, halo_axisA_y, halo_axisA_z :  array_like
+             x,y,z components of halo major axis
         """
         if 'table' in kwargs.keys():
             table = kwargs['table']
@@ -51,7 +62,7 @@ class CentralAlignment(object):
             Ay = kwargs['halo_axisA_z']
             Az = kwargs['halo_axisA_y']
 
-        p = np.ones(len(Ax))*self.param_dict['alignment_strenth']
+        p = np.ones(len(Ax))*self.param_dict['central_alignment_strenth']
 
         # set major axis orientation
         major_input_vectors = np.vstack((Ax, Ay, Az)).T
@@ -77,11 +88,11 @@ class CentralAlignment(object):
         table['galaxy_axisC_z'][:] = minor_v[:, 2]
 
 
-class SatelliteAlignment(object):
+class RadialSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, alignment_stregth=0):
+    def __init__(self, satellite_alignment_stregth=0):
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -96,7 +107,7 @@ class SatelliteAlignment(object):
         self._methods_to_inherit = (
             ['assign_orientation'])
         self.param_dict = ({
-            'alignment_strenth': alignment_stregth})
+            'satellite_alignment_strenth': satellite_alignment_stregth})
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -113,7 +124,7 @@ class SatelliteAlignment(object):
             halo_y = kwargs['halo_z']
             halo_z = kwargs['halo_y']
 
-        p = np.ones(len(halo_x))*self.param_dict['alignment_strenth']
+        p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strenth']
 
         # define halo-center - satellite vector
         dx = (table['x'] - halo_x)
@@ -124,6 +135,154 @@ class SatelliteAlignment(object):
 
         # set major axis orientation
         major_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
+
+        # randomly set minor axis orientation
+        minor_v = random_perpendicular_directions(major_v)
+
+        # the intermediate axis is determined
+        inter_v = vectors_normal_to_planes(major_v, minor_v)
+
+        # add orientations to the galaxy table
+        table['galaxy_axisA_x'][:] = major_v[:, 0]
+        table['galaxy_axisA_y'][:] = major_v[:, 1]
+        table['galaxy_axisA_z'][:] = major_v[:, 2]
+
+        table['galaxy_axisB_x'][:] = inter_v[:, 0]
+        table['galaxy_axisB_y'][:] = inter_v[:, 1]
+        table['galaxy_axisB_z'][:] = inter_v[:, 2]
+
+        table['galaxy_axisC_x'][:] = minor_v[:, 0]
+        table['galaxy_axisC_y'][:] = minor_v[:, 1]
+        table['galaxy_axisC_z'][:] = minor_v[:, 2]
+
+
+class MajorAxisSatelliteAlignment(object):
+    r"""
+    alignment model for satellite galaxies
+    """
+    def __init__(self, satellite_alignment_stregth=0):
+
+        self.gal_type = 'satellites'
+        self._mock_generation_calling_sequence = (['assign_orientation'])
+
+        self._galprop_dtypes_to_allocate = np.dtype(
+            [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
+             (str('galaxy_axisB_x'), 'f4'), (str('galaxy_axisB_y'), 'f4'), (str('galaxy_axisB_z'), 'f4'),
+             (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
+
+        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+
+        self._methods_to_inherit = (
+            ['assign_orientation'])
+        self.param_dict = ({
+            'satellite_alignment_strenth': satellite_alignment_stregth})
+
+    def assign_orientation(self, **kwargs):
+        r"""
+        assign a a set of three orthoganl unit vectors indicating the orientation
+        of the galaxies' major, intermediate, and minor axis
+        """
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            halo_x = table['halo_x']
+            halo_y = table['halo_y']
+            halo_z = table['halo_z']
+            Ax = table[self.list_of_haloprops_needed[3]]
+            Ay = table[self.list_of_haloprops_needed[4]]
+            Az = table[self.list_of_haloprops_needed[5]]
+        else:
+            halo_x = kwargs['halo_x']
+            halo_y = kwargs['halo_z']
+            halo_z = kwargs['halo_y']
+            Ax = kwargs['halo_axisA_x']
+            Ay = kwargs['halo_axisA_z']
+            Az = kwargs['halo_axisA_y']
+
+        p = np.ones(len(Ax))*self.param_dict['satellite_alignment_strenth']
+
+        # set major axis orientation
+        major_input_vectors = np.vstack((Ax, Ay, Az)).T
+        major_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
+
+        # randomly set minor axis orientation
+        minor_v = random_perpendicular_directions(major_v)
+
+        # the intermediate axis is determined
+        inter_v = vectors_normal_to_planes(major_v, minor_v)
+
+        # add orientations to the galaxy table
+        table['galaxy_axisA_x'][:] = major_v[:, 0]
+        table['galaxy_axisA_y'][:] = major_v[:, 1]
+        table['galaxy_axisA_z'][:] = major_v[:, 2]
+
+        table['galaxy_axisB_x'][:] = inter_v[:, 0]
+        table['galaxy_axisB_y'][:] = inter_v[:, 1]
+        table['galaxy_axisB_z'][:] = inter_v[:, 2]
+
+        table['galaxy_axisC_x'][:] = minor_v[:, 0]
+        table['galaxy_axisC_y'][:] = minor_v[:, 1]
+        table['galaxy_axisC_z'][:] = minor_v[:, 2]
+
+
+class HybridSatelliteAlignment(object):
+    r"""
+    alignment model for satellite galaxies
+    """
+    def __init__(self, satellite_alignment_stregth=0, radial_to_major=0.5):
+
+        self.gal_type = 'satellites'
+        self._mock_generation_calling_sequence = (['assign_orientation'])
+
+        self._galprop_dtypes_to_allocate = np.dtype(
+            [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
+             (str('galaxy_axisB_x'), 'f4'), (str('galaxy_axisB_y'), 'f4'), (str('galaxy_axisB_z'), 'f4'),
+             (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
+
+        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+
+        self._methods_to_inherit = (
+            ['assign_orientation'])
+        self.param_dict = ({
+            'satellite_alignment_strenth': satellite_alignment_stregth,
+            'radial_to_major': radial_to_major})
+
+    def assign_orientation(self, **kwargs):
+        r"""
+        assign a a set of three orthoganl unit vectors indicating the orientation
+        of the galaxies' major, intermediate, and minor axis
+        """
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            halo_x = table['halo_x']
+            halo_y = table['halo_y']
+            halo_z = table['halo_z']
+            Ax = table[self.list_of_haloprops_needed[3]]
+            Ay = table[self.list_of_haloprops_needed[4]]
+            Az = table[self.list_of_haloprops_needed[5]]
+        else:
+            halo_x = kwargs['halo_x']
+            halo_y = kwargs['halo_z']
+            halo_z = kwargs['halo_y']
+            Ax = kwargs['halo_axisA_x']
+            Ay = kwargs['halo_axisA_z']
+            Az = kwargs['halo_axisA_y']
+
+        p = np.ones(len(Ax))*self.param_dict['satellite_alignment_strenth']
+        a = np.ones(len(Ax))*self.param_dict['radial_to_major']
+
+        # define halo-center - satellite vector
+        dx = (table['x'] - halo_x)
+        dy = (table['y'] - halo_y)
+        dz = (table['z'] - halo_z)
+        v1 = np.vstack((dx, dy, dz)).T
+
+        # set major axis orientation
+        v2 = np.vstack((Ax, Ay, Az)).T
+
+        v3 = a*v1+(1.0-a)*v2
+        v3 = normalized_vectors(v3)
+
+        major_v = axes_correlated_with_input_vector(v3, p=p)
 
         # randomly set minor axis orientation
         minor_v = random_perpendicular_directions(major_v)
@@ -351,7 +510,7 @@ class DimrothWatson(rv_continuous):
 
 def erfiinv(y, kmax=100):
     r"""
-    inverse imaginary error function for y close to zero
+    inverse imaginary error function for y close to zero, -1 <= y <= 1
     """
 
     c = np.zeros(kmax)
@@ -382,7 +541,21 @@ def alignment_strenth(p):
     k[mask] = np.inf
     mask = (p == -1.0)
     k[mask] = -1.0*np.inf
-    return np.tan(p)
+    return -1.0*k
+
+
+def inverse_alignment_strenth(k):
+    r"""
+    convert shape parameter for costheta distribution to alignment strength
+    """
+
+    k = np.atleast_1d(k)
+    p = np.zeros(len(k))
+
+    k = k
+    p = -1.0*np.arctan(k)/(np.pi/2.0)
+
+    return p
 
 
 def axes_correlated_with_z(p, seed=None):
@@ -422,15 +595,15 @@ def axes_correlated_with_z(p, seed=None):
 
     with NumpyRNGContext(seed):
         phi = np.random.uniform(0, 2*np.pi, npts)
-        uran = np.random.rand(npts)
 
-    # sample cosine theta nonuniformily to correlate with in z-axis
-    if np.all(p == 0):
-        cos_t = uran*2.0 - 1.0
-    else:
-        k = alignment_strenth(p)
-        d = DimrothWatson()
-        cos_t = d.isf(uran, k)
+        # sample cosine theta nonuniformily to correlate with in z-axis
+        if np.all(p == 0):
+            uran = np.random.uniform(0, 1, npts)
+            cos_t = uran*2.0 - 1.0
+        else:
+            k = alignment_strenth(p)
+            d = DimrothWatson()
+            cos_t = d.rvs(k)
 
     sin_t = np.sqrt((1.-cos_t*cos_t))
 

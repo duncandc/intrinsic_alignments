@@ -216,7 +216,8 @@ class MonteCarloGalAnisotropicProf(object):
             rad_prof_func_table_indices.flatten())
 
     def mc_unit_sphere(self, Npts, **kwargs):
-        r""" Returns Npts random points on the unit sphere.
+        r"""
+        Returns Npts anisotropically distributed points on the unit sphere.
 
         Parameters
         ----------

@@ -97,8 +97,8 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         sin_t = np.sqrt((1.-cos_t*cos_t))
 
         c_to_b = c_to_a/b_to_a
-        x = (1.0/c_to_a)*sin_t * np.cos(phi)
-        y = (1.0/c_to_b)*sin_t * np.sin(phi)
+        x = 1.0/c_to_a*sin_t * np.cos(phi)
+        y = 1.0/c_to_b*sin_t * np.sin(phi)
         z = cos_t
 
         # define z-axis as the major axis
