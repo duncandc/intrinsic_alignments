@@ -50,7 +50,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         """
 
         seed = kwargs.get('seed', None)
-
+        
         if 'table' in kwargs:
             table = kwargs['table']
             try:
@@ -91,7 +91,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
 
         with NumpyRNGContext(seed):
             phi = np.random.uniform(0, 2*np.pi, Npts)
-            uran = np.random.rand(Npts)
+            uran = np.random.rand(Npts)*2 - 1
 
         cos_t = uran
         sin_t = np.sqrt((1.-cos_t*cos_t))
@@ -101,18 +101,18 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         y = (1.0/c_to_b)*sin_t * np.sin(phi)
         z = cos_t
 
-        # define z-axis as the major axis
-        z_correlated_axes = np.vstack((x, y, z)).T
+        # define x-axis as the major axis
+        x_correlated_axes = np.vstack((x, y, z)).T
 
-        z_axes = np.tile((0, 0, 1), Npts).reshape((Npts, 3))
+        x_axes = np.tile((1, 0, 0), Npts).reshape((Npts, 3))
         major_axes = np.vstack((halo_axisA_x, halo_axisA_y, halo_axisA_z)).T
 
-        # rotate z-axis into the major axis
-        angles = angles_between_list_of_vectors(z_axes, major_axes)
-        rotation_axes = vectors_normal_to_planes(z_axes, major_axes)
+        # rotate x-axis into the major axis
+        angles = angles_between_list_of_vectors(x_axes, major_axes)
+        rotation_axes = vectors_normal_to_planes(x_axes, major_axes)
         matrices = rotation_matrices_from_angles(angles, rotation_axes)
 
-        correlated_axes = rotate_vector_collection(matrices, z_correlated_axes)
+        correlated_axes = rotate_vector_collection(matrices, x_correlated_axes)
         return correlated_axes[:, 0], correlated_axes[:, 1], correlated_axes[:, 2]
 
     def mc_solid_sphere(self, *profile_params, **kwargs):
@@ -239,7 +239,7 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
         self.list_of_haloprops_needed = ['halo_b_to_a', 'halo_c_to_a', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
 
     def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4), conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
-            verbose=True, seed=None):
+            halo_axisA_x=0.0, halo_axisA_y=0.0, halo_axisA_z=1.0, verbose=True, seed=None):
         r""" Return a Monte Carlo realization of points
         in the phase space of an NFW halo in isotropic Jeans equilibrium.
 
@@ -304,10 +304,16 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
 
         m = np.zeros(Ngals) + mass
         c = np.zeros(Ngals) + conc
+        halo_axisA_x = np.zeros(Ngals) + halo_axisA_x
+        halo_axisA_y = np.zeros(Ngals) + halo_axisA_y
+        halo_axisA_z = np.zeros(Ngals) + halo_axisA_z
         rvir = NFWProfile.halo_mass_to_halo_radius(self, total_mass=m)
 
         x, y, z = self.mc_halo_centric_pos(c,
-            halo_radius=rvir, b_to_a=b_to_a, c_to_a=c_to_a, seed=seed)
+            halo_radius=rvir, b_to_a=b_to_a, c_to_a=c_to_a,
+            halo_axisA_x= halo_axisA_x,
+            halo_axisA_y= halo_axisA_y,
+            halo_axisA_z= halo_axisA_z, seed=seed)
         r = np.sqrt(x**2 + y**2 + z**2)
         scaled_radius = r/rvir
 
@@ -332,3 +338,5 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
             'radial_position': r, 'radial_velocity': vrad})
 
         return t
+
+

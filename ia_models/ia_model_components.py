@@ -19,7 +19,7 @@ class CentralAlignment(object):
     r"""
     alignment model for central galaxies
     """
-    def __init__(self, alignment_stregth=0):
+    def __init__(self, central_alignment_stregth=0):
 
         self.gal_type = 'centrals'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -34,7 +34,7 @@ class CentralAlignment(object):
         self._methods_to_inherit = (
             ['assign_orientation'])
         self.param_dict = ({
-            'alignment_strenth': alignment_stregth})
+            'central_alignment_strenth': central_alignment_stregth})
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -51,7 +51,7 @@ class CentralAlignment(object):
             Ay = kwargs['halo_axisA_z']
             Az = kwargs['halo_axisA_y']
 
-        p = np.ones(len(Ax))*self.param_dict['alignment_strenth']
+        p = np.ones(len(Ax))*self.param_dict['central_alignment_strenth']
 
         # set major axis orientation
         major_input_vectors = np.vstack((Ax, Ay, Az)).T
@@ -81,7 +81,7 @@ class SatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, alignment_stregth=0):
+    def __init__(self, satellite_alignment_stregth=0):
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -96,7 +96,7 @@ class SatelliteAlignment(object):
         self._methods_to_inherit = (
             ['assign_orientation'])
         self.param_dict = ({
-            'alignment_strenth': alignment_stregth})
+            'satellite_alignment_strenth': satellite_alignment_stregth})
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -113,7 +113,7 @@ class SatelliteAlignment(object):
             halo_y = kwargs['halo_z']
             halo_z = kwargs['halo_y']
 
-        p = np.ones(len(halo_x))*self.param_dict['alignment_strenth']
+        p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strenth']
 
         # define halo-center - satellite vector
         dx = (table['x'] - halo_x)
@@ -430,7 +430,7 @@ def axes_correlated_with_z(p, seed=None):
     else:
         k = alignment_strenth(p)
         d = DimrothWatson()
-        cos_t = d.isf(uran, k)
+        cos_t = d.rvs(k)
 
     sin_t = np.sqrt((1.-cos_t*cos_t))
 
