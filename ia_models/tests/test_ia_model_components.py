@@ -44,3 +44,17 @@ def test_DimrothWatson():
     P2 = d.cdf(1, k=k)
     assert np.isclose(P1, 0.0) & np.isclose(P2, 1.0)
 
+    # test rvs
+    N = 1000
+
+    k = -1.0
+    random_variates = d.rvs(k, size=N)
+    assert np.isclose(np.mean(random_variates), 0.0, atol=0.05)
+
+    k = 0.0
+    random_variates = d.rvs(k, size=N)
+    assert np.isclose(np.mean(random_variates), 0.0, atol=0.05)
+
+    k = 1.0
+    random_variates = d.rvs(k, size=N)
+    assert np.isclose(np.mean(random_variates), 0.0, atol=0.05)
