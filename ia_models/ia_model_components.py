@@ -5,13 +5,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
-from .utils import random_perpendicular_directions, vectors_normal_to_planes, angles_between_list_of_vectors,\
+from intrinsic_alignments.ia_models.utils import random_perpendicular_directions, vectors_normal_to_planes, angles_between_list_of_vectors,\
     rotation_matrices_from_angles, rotate_vector_collection, normalized_vectors
 from scipy.stats import rv_continuous
 from scipy.special import erf, erfi, erfinv
 
 
-__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment')
+__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', ' HybridSatelliteAlignment')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
@@ -279,7 +279,7 @@ class HybridSatelliteAlignment(object):
         # set major axis orientation
         v2 = np.vstack((Ax, Ay, Az)).T
 
-        v3 = a*v1+(1.0-a)*v2
+        v3 = a[:,np.newaxis]*v1+(1.0-a[:,np.newaxis])*v2
         v3 = normalized_vectors(v3)
 
         major_v = axes_correlated_with_input_vector(v3, p=p)
