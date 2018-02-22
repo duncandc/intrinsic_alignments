@@ -274,10 +274,10 @@ class HybridSatelliteAlignment(object):
         dx = (table['x'] - halo_x)
         dy = (table['y'] - halo_y)
         dz = (table['z'] - halo_z)
-        v1 = np.vstack((dx, dy, dz)).T
+        v1 = normalized_vectors(np.vstack((dx, dy, dz)).T)
 
         # set major axis orientation
-        v2 = np.vstack((Ax, Ay, Az)).T
+        v2 = normalized_vectors(np.vstack((Ax, Ay, Az)).T)
 
         v3 = a*v1+(1.0-a)*v2
         v3 = normalized_vectors(v3)
