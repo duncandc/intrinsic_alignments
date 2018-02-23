@@ -1,4 +1,4 @@
-""" 
+"""
 functions to facilitate unit vector operations
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -9,14 +9,14 @@ from astropy.utils.misc import NumpyRNGContext
 
 __all__ = ('elementwise_dot', 'elementwise_norm', 'normalized_vectors', 'random_perpendicular_directions',
            'rotation_matrices_from_angles', 'rotation_matrices_from_vectors', 'angles_between_list_of_vectors',
-           'vectors_normal_to_planes', 'rotate_vector_collection')
+           'vectors_normal_to_planes', 'rotate_vector_collection', 'project_onto_plane')
 
 
 __author__ = ('Andrew Hearin', )
 
 
 def elementwise_dot(x, y):
-    r""" 
+    r"""
     Calculate the dot product between
     each pair of elements in two input lists of 3d points.
 
@@ -58,7 +58,7 @@ def elementwise_norm(x):
 
 
 def normalized_vectors(vectors):
-    r""" 
+    r"""
     Return a unit-vector for each 3d vector in the input list of 3d points.
 
     Parameters
@@ -78,7 +78,7 @@ def normalized_vectors(vectors):
 
 
 def random_perpendicular_directions(v, seed=None):
-    r""" 
+    r"""
     Given an input list of 3d vectors, v, return a list of 3d vectors
     such that each returned vector has unit-length and is
     orthogonal to the corresponding vector in v.
@@ -116,7 +116,7 @@ def random_perpendicular_directions(v, seed=None):
 
 
 def rotation_matrices_from_angles(angles, directions):
-    r""" 
+    r"""
     Calculate a collection of rotation matrices defined by
     an input collection of rotation angles and rotation axes.
 
@@ -165,7 +165,7 @@ def rotation_matrices_from_angles(angles, directions):
 
 
 def rotation_matrices_from_vectors(v0, v1):
-    r""" 
+    r"""
     Calculate a collection of rotation matrices defined by the unique
     transformation rotating v1 into v2 about the mutually perpendicular axis.
 
@@ -200,7 +200,7 @@ def rotation_matrices_from_vectors(v0, v1):
 
 
 def angles_between_list_of_vectors(v0, v1, tol=1e-3):
-    r""" 
+    r"""
     Calculate the angle between a collection of 3d vectors
 
     Examples
@@ -247,7 +247,7 @@ def angles_between_list_of_vectors(v0, v1, tol=1e-3):
 
 
 def vectors_normal_to_planes(x, y):
-    r""" 
+    r"""
     Given a collection of 3d vectors x and y,
     return a collection of 3d unit-vectors that are orthogonal to x and y.
 
@@ -273,7 +273,7 @@ def vectors_normal_to_planes(x, y):
 
 
 def rotate_vector_collection(rotation_matrices, vectors):
-    r""" 
+    r"""
     Given a collection of rotation matrices and a collection of 3d vectors,
     apply each matrix to rotate the corresponding vector.
 
@@ -291,3 +291,13 @@ def rotate_vector_collection(rotation_matrices, vectors):
         Numpy array of shape (npts, 3) storing a collection of 3d vectors
     """
     return np.einsum(str('ijk,ik->ij'), rotation_matrices, vectors)
+
+
+def project_onto_plane(x, n):
+    """
+    given a collection of 3D vectors x and n,
+    project x onto the plane normal to vector n
+    """
+    n = normalized_vectors(n)
+    d = elementwise_dot(x,n)
+    return x - d[:,np.newaxis]*n
