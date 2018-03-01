@@ -6,12 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
 from intrinsic_alignments.ia_models.utils import random_perpendicular_directions, vectors_normal_to_planes, angles_between_list_of_vectors,\
-    rotation_matrices_from_angles, rotate_vector_collection, normalized_vectors
+    rotation_matrices_from_angles, rotate_vector_collection
+from halotools.utils import normalized_vectors, vectors_between_list_of_vectors
 from scipy.stats import rv_continuous
 from scipy.special import erf, erfi, erfinv
 
 
-__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', ' HybridSatelliteAlignment')
+__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
@@ -228,7 +229,7 @@ class HybridSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_stregth=0, radial_to_major=0.5):
+    def __init__(self, satellite_alignment_stregth=0, major_to_radial=0.5):
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -244,7 +245,7 @@ class HybridSatelliteAlignment(object):
             ['assign_orientation'])
         self.param_dict = ({
             'satellite_alignment_strenth': satellite_alignment_stregth,
-            'radial_to_major': radial_to_major})
+            'major_to_radial': major_to_radial})
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -267,8 +268,10 @@ class HybridSatelliteAlignment(object):
             Ay = kwargs['halo_axisA_z']
             Az = kwargs['halo_axisA_y']
 
-        p = np.ones(len(Ax))*self.param_dict['satellite_alignment_strenth']
-        a = np.ones(len(Ax))*self.param_dict['radial_to_major']
+        Ngal = len(Ax)
+
+        p = np.ones(Ngal)*self.param_dict['satellite_alignment_strenth']
+        a = np.ones(Ngal)*self.param_dict['major_to_radial']
 
         # define halo-center - satellite vector
         dx = (table['x'] - halo_x)
@@ -279,8 +282,23 @@ class HybridSatelliteAlignment(object):
         # set major axis orientation
         v2 = normalized_vectors(np.vstack((Ax, Ay, Az)).T)
 
-        v3 = a[:,np.newaxis]*v1+(1.0-a[:,np.newaxis])*v2
-        v3 = normalized_vectors(v3)
+        # account for handedness
+        seed = kwargs.get('seed', None)
+        with NumpyRNGContext(seed):
+             uran1 = np.random.random(Ngal)
+        if seed is not None:
+            seed = seed + 1
+        with NumpyRNGContext(seed):
+             uran2 = np.random.random(Ngal)
+        flip1 = np.ones(Ngal)
+        flip1[uran1 < 0.5] = -1.0
+        flip2 = np.ones(Ngal)
+        flip2[uran2 < 0.5] = -1.0
+        v1 = flip1[:, np.newaxis]*v1
+        v2 = flip2[:, np.newaxis]*v2
+
+        # define alignment vector inbetween v1 and v2
+        v3 = normalized_vectors(vectors_between_list_of_vectors(v1, v2, a))
 
         major_v = axes_correlated_with_input_vector(v3, p=p)
 

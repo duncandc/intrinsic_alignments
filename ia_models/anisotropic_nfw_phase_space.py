@@ -50,7 +50,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         """
 
         seed = kwargs.get('seed', None)
-        
+
         if 'table' in kwargs:
             table = kwargs['table']
             try:
