@@ -68,7 +68,9 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
             except KeyError:
                 with NumpyRNGContext(seed):
                     halo_axisA_x = np.random.random(len(table))*2-1
+                with NumpyRNGContext(seed+1):
                     halo_axisA_y = np.random.random(len(table))*2-1
+                with NumpyRNGContext(seed+2):
                     halo_axisA_z = np.random.random(len(table))*2-1
         else:
             try:
@@ -85,9 +87,11 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
                 halo_axisA_z = np.atleast_1d(kwargs['halo_axisA_z'])
             except KeyError:
                 with NumpyRNGContext(seed):
-                    halo_axisA_x = np.random.random(Npts)*2-1
-                    halo_axisA_y = np.random.random(Npts)*2-1
-                    halo_axisA_z = np.random.random(Npts)*2-1
+                    halo_axisA_x = np.random.random(len(table))*2-1
+                with NumpyRNGContext(seed+1):
+                    halo_axisA_y = np.random.random(len(table))*2-1
+                with NumpyRNGContext(seed+2):
+                    halo_axisA_z = np.random.random(len(table))*2-1
 
         with NumpyRNGContext(seed):
             phi = np.random.uniform(0, 2*np.pi, Npts)
