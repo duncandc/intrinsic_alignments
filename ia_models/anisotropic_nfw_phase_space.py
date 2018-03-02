@@ -6,13 +6,10 @@ import numpy as np
 from astropy.table import Table
 from astropy.utils.misc import NumpyRNGContext
 
-from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.nfw_profile import NFWProfile
-from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.kernels import unbiased_dimless_vrad_disp as unbiased_dimless_vrad_disp_kernel
-
-from halotools.empirical_models.phase_space_models.analytic_models.satellites.nfw.nfw_phase_space import NFWPhaseSpace, _relative_positions_and_velocities, _sign_pbc
-from halotools.empirical_models.phase_space_models.analytic_models.monte_carlo_helpers import MonteCarloGalProf
-
-from .utils import *
+from halotools.empirical_models import NFWProfile, MonteCarloGalProf, NFWPhaseSpace
+from halotools.utils import angles_between_list_of_vectors, vectors_normal_to_planes
+from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
+from halotools.mock_observables import relative_positions_and_velocities
 
 
 __author__ = ['Andrew Hearin', 'Duncan Campbell']
@@ -101,11 +98,11 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         sin_t = np.sqrt((1.-cos_t*cos_t))
 
         c_to_b = c_to_a/b_to_a
+
+        # temporarily use x-axis as the major axis
         x = 1.0/c_to_a*sin_t * np.cos(phi)
         y = 1.0/c_to_b*sin_t * np.sin(phi)
         z = cos_t
-
-        # define x-axis as the major axis
         x_correlated_axes = np.vstack((x, y, z)).T
 
         x_axes = np.tile((1, 0, 0), Npts).reshape((Npts, 3))
@@ -157,7 +154,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
             try:
                 assert len(profile_params) > 0
             except AssertionError:
-                raise HalotoolsError("If not passing an input ``table`` "
+                raise ValueError("If not passing an input ``table`` "
                     "keyword argument to mc_solid_sphere,\n"
                     "must pass a ``profile_params`` keyword argument")
 
@@ -172,7 +169,8 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         seed = kwargs.get('seed', None)
         if seed is not None:
             seed += 1
-        dimensionless_radial_distance = self._mc_dimensionless_radial_distance(*profile_params, seed=seed)
+        dimensionless_radial_distance = self._mc_dimensionless_radial_distance(
+                *profile_params, seed=seed)
 
         # get random positions within the solid sphere
         x *= dimensionless_radial_distance
@@ -187,7 +185,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
             except KeyError:
                 msg = ("The mc_solid_sphere method of the MonteCarloGalProf class "
                     "requires a table key ``host_centric_distance`` to be pre-allocated ")
-                raise HalotoolsError(msg)
+                raise ValueError(msg)
 
         return x, y, z
 
@@ -242,7 +240,8 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
         super(AnisotropicNFWPhaseSpace, self).__init__(**kwargs)
         self.list_of_haloprops_needed = ['halo_b_to_a', 'halo_c_to_a', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
 
-    def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4), conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
+    def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4),
+            conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
             halo_axisA_x=0.0, halo_axisA_y=0.0, halo_axisA_z=1.0, verbose=True, seed=None):
         r""" Return a Monte Carlo realization of points
         in the phase space of an NFW halo in isotropic Jeans equilibrium.
@@ -315,9 +314,9 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
 
         x, y, z = self.mc_halo_centric_pos(c,
             halo_radius=rvir, b_to_a=b_to_a, c_to_a=c_to_a,
-            halo_axisA_x= halo_axisA_x,
-            halo_axisA_y= halo_axisA_y,
-            halo_axisA_z= halo_axisA_z, seed=seed)
+            halo_axisA_x=halo_axisA_x,
+            halo_axisA_y=halo_axisA_y,
+            halo_axisA_z=halo_axisA_z, seed=seed)
         r = np.sqrt(x**2 + y**2 + z**2)
         scaled_radius = r/rvir
 
@@ -331,9 +330,9 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
             seed += 1
         vz = self.mc_radial_velocity(scaled_radius, m, c, seed=seed)
 
-        xrel, vxrel = _relative_positions_and_velocities(x, 0, v1=vx, v2=0)
-        yrel, vyrel = _relative_positions_and_velocities(y, 0, v1=vy, v2=0)
-        zrel, vzrel = _relative_positions_and_velocities(z, 0, v1=vz, v2=0)
+        xrel, vxrel = relative_positions_and_velocities(x, 0, v1=vx, v2=0)
+        yrel, vyrel = relative_positions_and_velocities(y, 0, v1=vy, v2=0)
+        zrel, vzrel = relative_positions_and_velocities(z, 0, v1=vz, v2=0)
 
         vrad = (xrel*vxrel + yrel*vyrel + zrel*vzrel)/r
 
