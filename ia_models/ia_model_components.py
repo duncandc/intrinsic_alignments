@@ -1,5 +1,5 @@
 r"""
-Numpy kernels for modeling intrinsic alignments
+halotools model components for modelling central and scatellite alignments
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
