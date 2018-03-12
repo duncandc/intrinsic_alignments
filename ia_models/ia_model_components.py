@@ -11,8 +11,10 @@ from halotools.utils import normalized_vectors, vectors_between_list_of_vectors
 from scipy.stats import rv_continuous
 from scipy.special import erf, erfi, erfinv
 
+from warnings import warn
 
-__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment')
+
+__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment', 'DimrothWatson')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
@@ -369,26 +371,6 @@ class DimrothWatson(rv_continuous):
         p = norm*np.exp(-1.0*k*x**2)
         return p
 
-    def _cdf(self, x, k):
-        r"""
-        cumulative distribution function
-        """
-
-        # mask for positive and negative k cases
-        negative_k = (k < 0) & (k != 0)
-        non_zero_k = (k != 0)
-
-        norm = self._norm(k)
-
-        k = np.fabs(k)
-
-        # array to store result
-        result = np.zeros(len(k))
-        result[non_zero_k] = np.sqrt(np.pi)*(erf(x[non_zero_k]*np.sqrt(k[non_zero_k]))+erf(np.sqrt(k[non_zero_k])))/(4*np.sqrt(k[non_zero_k]))
-        result[negative_k] = np.sqrt(np.pi)*(erfi(x[negative_k]*np.sqrt(k[negative_k]))+erfi(np.sqrt(k[negative_k])))/(4*np.sqrt(k[negative_k]))
-
-        return np.where(k == 0, 0.5*x+0.5, 2.0*norm*result)
-
     def _rvs(self, k):
         r"""
         random variates
@@ -417,7 +399,7 @@ class DimrothWatson(rv_continuous):
         # apply rejection sampling technique to sample from pdf
         n_sucess = np.sum(zero_k)  # number of sucesessful draws from pdf
         n_remaining = size - np.sum(zero_k)  # remaining draws necessary
-        n_iter = 0  # number of sample-rejhect iterations
+        n_iter = 0  # number of sample-reject iterations
         kk = k[~zero_k]  # store subset of k values that still need to be sampled
         mask = np.array([False]*size)  # mask indicating which k values have a sucessful sample
         mask[zero_k] = True
@@ -454,7 +436,7 @@ class DimrothWatson(rv_continuous):
             # count the number of succesful samples
             n_sucess += np.sum(keep)
 
-            #store y values
+            # store y values
             result[~mask] = y
 
             # update mask indicating which values need to be redrawn
@@ -468,15 +450,6 @@ class DimrothWatson(rv_continuous):
 
         return result
 
-    def g1(self, x, k):
-        r"""
-        an upper envelope function for k>0
-        """
-        k = -1*k
-        eta = np.sqrt(-1*k)
-        C = eta/(np.arctan(eta))
-        return (C/(1+eta**2*x**2))
-
     def g1_pdf(self, x, k):
         r"""
         proposal distribution for pdf for k>0
@@ -488,7 +461,7 @@ class DimrothWatson(rv_continuous):
 
     def g1_isf(self, y, k):
         r"""
-        an upper envelope function for k>0
+        inverse survival function of proposal distribution for pdf for k>0
         """
         k = -1*k
         eta = np.sqrt(-1*k)
@@ -496,7 +469,7 @@ class DimrothWatson(rv_continuous):
 
     def m1(self, k):
         r"""
-        eneveloping factor for proposal distribution for pdf for k>0
+        eneveloping factor for proposal distribution for k>0
         """
         return 2.0*np.ones(len(k))
 
@@ -524,6 +497,38 @@ class DimrothWatson(rv_continuous):
         C = k*(np.exp(k)-1)**(-1)
         norm = 2.0*(np.exp(k)-1)/k
         return C*norm
+
+
+def symmetric_watson_mixture_liklihood(x, k, f):
+    """
+    Return negative log-liklihood of a symmetric dimroth-watson k-componenent mixture model
+
+    Parameters
+    ==========
+    x : array_like
+        A N by k array of cos(theta)
+
+    k : shape parameter of the distributions
+
+    Returns
+    =======
+    lnL : numpy.array
+    """
+
+    d = DimrothWatson()
+
+    N = np.shape(x)[0]
+    N_components = np.shape(x)[1]
+
+    p = np.zeros((N, N_components))
+    for i in range(0, N_components):
+        p[:,i] = d.pdf(x[:,i], k=k)
+
+    l = np.zeros((N_components,))
+    for i in range(0, N_components):
+        l[i] = np.sum(f[:,i]*np.log(p[:,i]))
+
+    return -1.0*np.sum(l)
 
 
 def erfiinv(y, kmax=100):
