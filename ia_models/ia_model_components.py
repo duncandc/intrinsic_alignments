@@ -10,12 +10,20 @@ from intrinsic_alignments.ia_models.utils import random_perpendicular_directions
 from halotools.utils import normalized_vectors, vectors_between_list_of_vectors
 from scipy.stats import rv_continuous
 from scipy.special import erf, erfi, erfinv
+from scipy.optimize import minimize
 
 from warnings import warn
 
 
 __all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment', 'DimrothWatson')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
+
+
+def power_law(x, a, alpha):
+    """
+    power law model
+    """
+    return a*x**alpha
 
 
 class CentralAlignment(object):
@@ -95,22 +103,31 @@ class RadialSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_stregth=0):
+    def __init__(self, satellite_alignment_a1=1.0,  satellite_alignment_alpha1=0.0):
 
         self.gal_type = 'satellites'
-        self._mock_generation_calling_sequence = (['assign_orientation'])
+        self._mock_generation_calling_sequence = (['inherit_halocat_properties', 'assign_orientation'])
 
         self._galprop_dtypes_to_allocate = np.dtype(
             [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
              (str('galaxy_axisB_x'), 'f4'), (str('galaxy_axisB_y'), 'f4'), (str('galaxy_axisB_z'), 'f4'),
              (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
 
-        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z']
+        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_rvir']
+
+        self._additional_kwargs_dict = dict(inherit_halocat_properties=['Lbox'])
 
         self._methods_to_inherit = (
-            ['assign_orientation'])
+            ['assign_orientation', 'inherit_halocat_properties'])
         self.param_dict = ({
-            'satellite_alignment_strenth': satellite_alignment_stregth})
+            'satellite_alignment_a1': satellite_alignment_a1,
+            'satellite_alignment_alpha1': satellite_alignment_alpha1})
+    
+    def inherit_halocat_properties(self, seed=None, **kwargs):
+        """
+        """
+        Lbox = kwargs['Lbox']
+        self._Lbox = Lbox
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -122,21 +139,43 @@ class RadialSatelliteAlignment(object):
             halo_x = table['halo_x']
             halo_y = table['halo_y']
             halo_z = table['halo_z']
+            halo_r = table['halo_rvir']
+            Lbox = self._Lbox
         else:
             halo_x = kwargs['halo_x']
             halo_y = kwargs['halo_z']
             halo_z = kwargs['halo_y']
+            halo_r = kwargs['halo_rvir']
+            Lbox = kwargs['Lbox']
 
-        p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strenth']
+        #p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strenth']
 
         # define halo-center - satellite vector
         dx = (table['x'] - halo_x)
+        mask = dx>Lbox[0]/2.0
+        dx[mask] = dx[mask] - Lbox[0]
+        mask = dx<-1.0*Lbox[0]/2.0
+        dx[mask] = dx[mask] + Lbox[0]
+        
         dy = (table['y'] - halo_y)
+        mask = dy>Lbox[1]/2.0
+        dx[mask] = dy[mask] - Lbox[1]
+        mask = dy<-1.0*Lbox[1]/2.0
+        dx[mask] = dy[mask] + Lbox[1]
+
         dz = (table['z'] - halo_z)
+        mask = dz>Lbox[2]/2.0
+        dx[mask] = dz[mask] - Lbox[2]
+        mask = dz<-1.0*Lbox[2]/2.0
+        dx[mask] = dz[mask] + Lbox[2]
+
+        # calculate scaled halo virial radius
+        r = np.sqrt(dx**2 + dy**2 + dz**2)/halo_r
 
         major_input_vectors = np.vstack((dx, dy, dz)).T
 
         # set major axis orientation
+        p = self.radial_satellite_alignment_strength(r)
         major_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
 
         # randomly set minor axis orientation
@@ -158,12 +197,20 @@ class RadialSatelliteAlignment(object):
         table['galaxy_axisC_y'][:] = minor_v[:, 1]
         table['galaxy_axisC_z'][:] = minor_v[:, 2]
 
+    def radial_satellite_alignment_strength(self, r):
+        """
+        strength of alignment as a function of scaled halo-centric radius
+        """
+        p = power_law(r, self.param_dict['satellite_alignment_a1'], self.param_dict['satellite_alignment_alpha1'])
+        p[p>=0.99]=0.99
+        return p
+
 
 class MajorAxisSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_stregth=0):
+    def __init__(self, satellite_alignment_a1=1.0,  satellite_alignment_alpha1=0.0):
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -178,7 +225,8 @@ class MajorAxisSatelliteAlignment(object):
         self._methods_to_inherit = (
             ['assign_orientation'])
         self.param_dict = ({
-            'satellite_alignment_strenth': satellite_alignment_stregth})
+            'satellite_alignment_a1': satellite_alignment_a1,
+            'satellite_alignment_alpha1': satellite_alignment_alpha1})
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -231,23 +279,51 @@ class HybridSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_stregth=0, major_to_radial=0.5):
+    def __init__(self, satellite_alignment_a1=0.2, satellite_alignment_a2=0.8,
+        satellite_alignment_alpha1=-0.3, satellite_alignment_alpha2=-0.05):
+        """
+        Parameters
+        ==========
+        satellite_alignment_a1 : float
+            power-law parameter for hybrid alignment vector
+
+        satellite_alignment_a2 : float
+            power-law parameter for alignment strength
+
+        satellite_alignment_alpha1 : float
+            power-law parameter for hybrid alignment vector
+
+        satellite_alignment_alpha2 : float
+            power-law parameter for alignment strength
+        """
 
         self.gal_type = 'satellites'
-        self._mock_generation_calling_sequence = (['assign_orientation'])
+        self._mock_generation_calling_sequence = (['inherit_halocat_properties', 'assign_orientation'])
 
         self._galprop_dtypes_to_allocate = np.dtype(
             [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
              (str('galaxy_axisB_x'), 'f4'), (str('galaxy_axisB_y'), 'f4'), (str('galaxy_axisB_z'), 'f4'),
              (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
 
-        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z',
+            'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z', 'halo_rvir']
+        
+        self._additional_kwargs_dict = dict(inherit_halocat_properties=['Lbox'])
 
         self._methods_to_inherit = (
-            ['assign_orientation'])
+            ['inherit_halocat_properties', 'assign_orientation'])
+
         self.param_dict = ({
-            'satellite_alignment_strenth': satellite_alignment_stregth,
-            'major_to_radial': major_to_radial})
+            'satellite_alignment_a1': satellite_alignment_a1,
+            'satellite_alignment_a2': satellite_alignment_a2,
+            'satellite_alignment_alpha1': satellite_alignment_alpha1,
+            'satellite_alignment_alpha2': satellite_alignment_alpha2})
+
+    def inherit_halocat_properties(self, seed=None, **kwargs):
+        """
+        """
+        Lbox = kwargs['Lbox']
+        self._Lbox = Lbox
 
     def assign_orientation(self, **kwargs):
         r"""
@@ -262,6 +338,8 @@ class HybridSatelliteAlignment(object):
             Ax = table[self.list_of_haloprops_needed[3]]
             Ay = table[self.list_of_haloprops_needed[4]]
             Az = table[self.list_of_haloprops_needed[5]]
+            halo_r = table['halo_rvir']
+            Lbox = self._Lbox
         else:
             halo_x = kwargs['halo_x']
             halo_y = kwargs['halo_z']
@@ -269,22 +347,37 @@ class HybridSatelliteAlignment(object):
             Ax = kwargs['halo_axisA_x']
             Ay = kwargs['halo_axisA_z']
             Az = kwargs['halo_axisA_y']
+            halo_r = kwargs['halo_rvir']
+            Lbox = kwargs['Lbox']
 
         Ngal = len(Ax)
 
-        p = np.ones(Ngal)*self.param_dict['satellite_alignment_strenth']
-        a = np.ones(Ngal)*self.param_dict['major_to_radial']
-
-        # define halo-center - satellite vector
+        # define radial vector
         dx = (table['x'] - halo_x)
+        mask = dx > Lbox[0]/2.0
+        dx[mask] = dx[mask] - Lbox[0]
+        mask = dx < -1.0*Lbox[0]/2.0
+        dx[mask] = dx[mask] + Lbox[0]
+        
         dy = (table['y'] - halo_y)
+        mask = dy > Lbox[1]/2.0
+        dx[mask] = dy[mask] - Lbox[1]
+        mask = dy < -1.0*Lbox[1]/2.0
+        dx[mask] = dy[mask] + Lbox[1]
+
         dz = (table['z'] - halo_z)
+        mask = dz > Lbox[2]/2.0
+        dx[mask] = dz[mask] - Lbox[2]
+        mask = dz < -1.0*Lbox[2]/2.0
+        dx[mask] = dz[mask] + Lbox[2]
+        
+        # radial vector
         v1 = normalized_vectors(np.vstack((dx, dy, dz)).T)
 
-        # set major axis orientation
+        # major axis orientation
         v2 = normalized_vectors(np.vstack((Ax, Ay, Az)).T)
 
-        # account for handedness
+        # account for handedness by randomly flipping alignment components
         seed = kwargs.get('seed', None)
         with NumpyRNGContext(seed):
              uran1 = np.random.random(Ngal)
@@ -298,10 +391,20 @@ class HybridSatelliteAlignment(object):
         flip2[uran2 < 0.5] = -1.0
         v1 = flip1[:, np.newaxis]*v1
         v2 = flip2[:, np.newaxis]*v2
+        
+        # calculate scaled halo virial radius
+        r = np.sqrt(dx**2 + dy**2 + dz**2)/halo_r
+
+        # get alignment radially dependent alignment strength
+        p = self.radial_satellite_alignment_strength(r)
+        
+        # get major to radial parameter
+        a = self.radial_hybrid_alignment_vector_parameter(r)
 
         # define alignment vector inbetween v1 and v2
         v3 = normalized_vectors(vectors_between_list_of_vectors(v1, v2, a))
-
+        
+        # get galaxy major axis
         major_v = axes_correlated_with_input_vector(v3, p=p)
 
         # randomly set minor axis orientation
@@ -323,11 +426,66 @@ class HybridSatelliteAlignment(object):
         table['galaxy_axisC_y'][:] = minor_v[:, 1]
         table['galaxy_axisC_z'][:] = minor_v[:, 2]
 
+    def radial_satellite_alignment_strength(self, r):
+        """
+        strength of alignment as a function of scaled halo-centric radius
+        """
+        p = power_law(r, self.param_dict['satellite_alignment_a2'], self.param_dict['satellite_alignment_alpha2'])
+        p[p>=0.99]=0.99
+        return p
+
+    def radial_hybrid_alignment_vector_parameter(self, r):
+        """
+        hybrid alignment vector parameter
+        """
+        a = power_law(r, self.param_dict['satellite_alignment_a1'], self.param_dict['satellite_alignment_alpha1'])
+        a[a>1.0]=1.0
+        return a
+
 
 class DimrothWatson(rv_continuous):
     r"""
-    distribution of :math:`\cos(\theta)' for a  Dimroth-Watson distribution
+    A Dimroth-Watson distribution of :math:`\cos(\theta)'
+
+    Parameters
+    ==========
+    k : float
+        shape paramater
+
+    Notes
+    =====
+    The Dimroth-Watson distribution is defined as:
+
+    .. math::
+        p(\cos(\theta)) = B(k)\exp[-k\cos(\theta)^2]\mathrm{d}\cos(\theta)
+
+    where 
+
+    .. math::
+        B(k) = \frac{1}{2}int_0^1\exp(-k t^2)\mathrm{d}t
+
+    We assume the ISO convention for spherical coordinates, where :math:`\theta`
+    is the polar angle, bounded between :math:`[-\pi, \pi]`, and :math:`\phi`
+    is the azimuthal angle, where for a Dimroth-Watson distribution, :math:`phi' 
+    is a uniform random variable between :math:`[0, 2\pi]`: for all `k`. 
+
+    For :math:`k>0`, the distribution of points on a sphere is bipolar.
+    For :math:`k=0`, the distribution of points on a sphere is uniform.
+    For :math:`k<0`, the distribution of points on a sphere is girdle.
+
+    Note that as :math:`k \rarrow \infty`:
+    
+    .. math::
+        p(\cos(\theta)) = \frac{1}{2}\left[ \delta(\cos(\theta) + 1) + \delta(\cos(\theta) - 1) \right]\mathrm{d}\cos(\theta)
+    
+    and as :math:`k \rarrow -\infty`:
+
+    .. math::
+        p(\cos(\theta)) = \frac{1}{2}\delta(\cos(\theta))\mathrm{d}\cos(\theta)
+
+    Needless to say, for large :math:`|k|`, the attributes of this class are approximate and not well tested.
     """
+
     def _argcheck(self, k):
         r"""
         check arguments
@@ -339,7 +497,7 @@ class DimrothWatson(rv_continuous):
 
     def _norm(self, k):
         r"""
-        caclulate normalization constant
+        normalization constant
         """
 
         k = np.atleast_1d(k)
@@ -366,17 +524,57 @@ class DimrothWatson(rv_continuous):
     def _pdf(self, x, k):
         r"""
         probability distribution function
+
+        Parameters
+        ==========
+        k : float
+            shape parameter
+
+        See the Notes section for a discussion of large and small `k`.
         """
-        norm = self._norm(k)
-        p = norm*np.exp(-1.0*k*x**2)
+        
+        # process arguments
+        k = np.atleast_1d(k).astype(np.float64)
+        x = np.atleast_1d(x).astype(np.float64)
+
+        with np.errstate(over='ignore', invalid='ignore'):
+            norm = self._norm(k)
+            p = norm*np.exp(-1.0*k*x**2)
+            p = np.nan_to_num(p)
+
+        # deal with the edge cases
+        epsilon = np.finfo(float).eps
+        edge_mask = (p >= 1.0/epsilon) | (p == 0.0)
+        p[edge_mask] = 0.0
+        
+        # large positive k (bipolar)
+        bipolar = (x >= (1.0 - epsilon)) | (x <= (-1.0 + epsilon))
+        p[bipolar & edge_mask & (k>1)] = 1.0/(2.0*epsilon)
+        
+        # large negative k (girdle)
+        girdle = (x >= (0.0 - epsilon)) & (x <= (0.0 + epsilon))
+        p[girdle & edge_mask & (k <- 1)] = 1.0/(2.0*epsilon)
+
         return p
 
     def _rvs(self, k):
         r"""
-        random variates
+        random variate sampling
+
+        Parameters
+        ==========
+        k : array_like
+            array of shape parameters
+
+        Notes
+        =====
+        The random variate sampling for this distribution is an implementation 
+        of the rejection-sampling technique.  
+
+        The Proposal distributions are taken from Best & Fisher (1986).
         """
 
-        k = np.atleast_1d(k)
+        k = np.atleast_1d(k).astype(np.float64)
         size = self._size[0]
         if size != 1:
             if len(k) == size:
@@ -389,6 +587,7 @@ class DimrothWatson(rv_continuous):
         else:
             size = len(k)
 
+        # vector to store random variates
         result = np.zeros(size)
 
         # take care of k=0 case
@@ -396,14 +595,24 @@ class DimrothWatson(rv_continuous):
         uran0 = np.random.random(np.sum(zero_k))*2 - 1.0
         result[zero_k] = uran0
 
+        # take care of edge cases, i.e. |k| very large
+        with np.errstate(over='ignore'):
+            x = np.exp(k)
+            inf_mask = np.array([False]*size)
+        edge_mask = (x == np.inf) | (x == 0.0)
+        result[edge_mask & (k>0)] = np.random.choice([1,-1], size=np.sum(edge_mask & (k>0)))
+        result[edge_mask & (k<0)] = 0.0
+
         # apply rejection sampling technique to sample from pdf
-        n_sucess = np.sum(zero_k)  # number of sucesessful draws from pdf
-        n_remaining = size - np.sum(zero_k)  # remaining draws necessary
+        n_sucess = np.sum(zero_k) + np.sum(edge_mask)  # number of sucesessful draws from pdf
+        n_remaining = size - n_sucess  # remaining draws necessary
         n_iter = 0  # number of sample-reject iterations
-        kk = k[~zero_k]  # store subset of k values that still need to be sampled
+        kk = k[(~zero_k) & (~edge_mask)]  # store subset of k values that still need to be sampled
         mask = np.array([False]*size)  # mask indicating which k values have a sucessful sample
         mask[zero_k] = True
-        while n_sucess < size:
+
+        max_iter = 100
+        while (n_sucess < size) & (n_iter < max_iter):
             # get three uniform random numbers
             uran1 = np.random.random(n_remaining)
             uran2 = np.random.random(n_remaining)
@@ -447,6 +656,10 @@ class DimrothWatson(rv_continuous):
 
             n_iter += 1
             n_remaining = np.sum(~keep)
+
+        if (n_iter == max_iter):
+            msg = ('The maximum number of iterations reached, random variates may not be represnetitive.')
+            raise warn(msg)
 
         return result
 
@@ -498,8 +711,86 @@ class DimrothWatson(rv_continuous):
         norm = 2.0*(np.exp(k)-1)/k
         return C*norm
 
+def fit_watson_mixture_model(x, ptol=0.01, max_iter=50, verbose=False):
+    """
+    fit for the alignment strength of a symmetric dimroth-watson k-componenent mixture model
+    
+    Parameters
+    ==========
+    x : array_like
+        A N by k array of cos(theta)
 
-def symmetric_watson_mixture_liklihood(x, k, f):
+    ptol : float
+
+    max_iter : int
+    """
+    
+    def f(p, x, r):
+        """
+        function to minimize in each step
+        """
+        k = alignment_strenth(p)
+        l = watson_mixture_liklihood(x, k=k, f=r)
+        return l
+
+    continue_loop=True
+    p0 = 0.0
+    num_iter = 0
+    while continue_loop==True:
+        r = watson_mixture_membership(x, p0)
+        p1 = minimize(f, (p0), args=(x, r, ), bounds=[(-0.99,0.99)]).x[0]
+        num_iter += 1
+        dp = (p1-p0)/p1
+        if (dp<ptol) | (num_iter>=max_iter):
+            continue_loop=False
+        if verbose:
+            print(num_iter, p1)
+        p0=p1
+
+    return p1
+
+
+def watson_mixture_membership(x, p):
+    """
+    return the membership ratio for a symmetric dimroth-watson k-componenent mixture model
+
+    Parameters
+    ==========
+    x : array_like
+        A N by k array of cos(theta)
+
+    p : array_like
+        probability
+
+    Returns
+    =======
+    lnL : numpy.array
+        log-liklihood sample `x` was drawn from the distribution
+    """
+
+    d = DimrothWatson()
+
+    # process arguments
+    x = np.atleast_1d(x)
+
+    k = alignment_strenth(p)
+    
+    # size of sample
+    N = np.shape(x)[0]
+    # number of distributions
+    N_components = np.shape(x)[1]
+
+    p = np.zeros((N, N_components))
+    for i in range(0, N_components):
+        p[:,i] = d.pdf(x[:,i], k=k)
+    
+    f = np.zeros((N, N_components))
+    for i in range(0, N_components):
+        f[:,i] = p[:,i]/np.sum(p, axis=-1)
+    
+    return f
+
+def watson_mixture_liklihood(x, f, k):
     """
     Return negative log-liklihood of a symmetric dimroth-watson k-componenent mixture model
 
@@ -508,22 +799,40 @@ def symmetric_watson_mixture_liklihood(x, k, f):
     x : array_like
         A N by k array of cos(theta)
 
-    k : shape parameter of the distributions
+    f: array_like
+        membership 
+
+    k : float
+        shape parameter of the distribution
 
     Returns
     =======
     lnL : numpy.array
+        log-liklihood sample `x` was drawn from the distribution
     """
-
+    
+    # initialize distribution
     d = DimrothWatson()
+    
+    # process arguments
+    x = np.atleast_1d(x)
+    f = np.atleast_1d(f)
+    if np.shape(x) != np.shape(f):
+        msg = ('`x` and `f` must be the same shape.')
+        raise ValueError(msg)
 
+    # size of sample
     N = np.shape(x)[0]
+    # number of distributions
     N_components = np.shape(x)[1]
 
+    # calculate the probabilities each point in the sample
+    # was drawn from each individual component
     p = np.zeros((N, N_components))
     for i in range(0, N_components):
         p[:,i] = d.pdf(x[:,i], k=k)
 
+    # log-liklihood liklihood 
     l = np.zeros((N_components,))
     for i in range(0, N_components):
         l[i] = np.sum(f[:,i]*np.log(p[:,i]))
