@@ -5,7 +5,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
-
+from astropy.table import Table
+from halotools.utils import crossmatch
 
 __all__ = ('elementwise_dot', 'elementwise_norm', 'normalized_vectors', 'random_perpendicular_directions',
            'rotation_matrices_from_angles', 'rotation_matrices_from_vectors', 'angles_between_list_of_vectors',
@@ -13,6 +14,63 @@ __all__ = ('elementwise_dot', 'elementwise_norm', 'normalized_vectors', 'random_
 
 
 __author__ = ('Andrew Hearin', )
+
+
+def halocat_to_galaxy_table(halocat):
+    """
+    convet a Halotools halocat.halo_table and create a test galaxy_table object to test model componenets
+    """
+
+    halo_id = halocat.halo_table['halo_id']
+    halo_upid = halocat.halo_table['halo_upid']
+
+    table = Table([halo_id, halo_upid], names=('halo_id', 'halo_upid'))
+    table['x'] = halocat.halo_table['halo_x']
+    table['y'] = halocat.halo_table['halo_y']
+    table['z'] = halocat.halo_table['halo_z']
+    table['vx'] = halocat.halo_table['halo_vx']
+    table['vy'] = halocat.halo_table['halo_vy']
+    table['vz'] = halocat.halo_table['halo_vz']
+    table['halo_mpeak'] = halocat.halo_table['halo_mpeak']
+
+    table['galaxy_axisA_x'] = 0.0
+    table['galaxy_axisA_y'] = 0.0
+    table['galaxy_axisA_z'] = 0.0
+
+    table['galaxy_axisB_x'] = 0.0
+    table['galaxy_axisB_y'] = 0.0
+    table['galaxy_axisB_z'] = 0.0
+
+    table['galaxy_axisC_x'] = 0.0
+    table['galaxy_axisC_y'] = 0.0
+    table['galaxy_axisC_z'] = 0.0
+
+    # centrals vs satellites
+    hosts = (halocat.halo_table['halo_upid'] == -1)
+    subs = (halocat.halo_table['halo_upid'] != -1)
+    table['gal_type'] = 'satellites'
+    table['gal_type'][hosts] = 'centrals'
+    table['gal_type'][subs] = 'satellites'
+
+    # host halo properties
+    inds1, inds2 = crossmatch(halocat.halo_table['halo_hostid'], halocat.halo_table['halo_id'])
+    table['halo_x'] = 0.0
+    table['halo_x'][inds1] = halocat.halo_table['halo_x'][inds2]
+    table['halo_y'] = 0.0
+    table['halo_y'][inds1] = halocat.halo_table['halo_y'][inds2]
+    table['halo_z'] = 0.0
+    table['halo_z'][inds1] = halocat.halo_table['halo_z'][inds2]
+    table['halo_mvir'] = 0.0
+    table['halo_mvir'][inds1] = halocat.halo_table['halo_mvir'][inds2]
+
+    table['halo_axisA_x'] = 0.0
+    table['halo_axisA_x'][inds1] = halocat.halo_table['halo_axisA_x'][inds2]
+    table['halo_axisA_y'] = 0.0
+    table['halo_axisA_y'][inds1] = halocat.halo_table['halo_axisA_y'][inds2]
+    table['halo_axisA_z'] = 0.0
+    table['halo_axisA_z'][inds1] = halocat.halo_table['halo_axisA_z'][inds2]
+
+    return table
 
 
 def elementwise_dot(x, y):

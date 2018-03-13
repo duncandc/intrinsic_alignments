@@ -77,25 +77,29 @@ class CentralAlignment(object):
         # the intermediate axis is determined
         inter_v = vectors_normal_to_planes(major_v, minor_v)
 
+        mask = (table['gal_type'] == self.gal_type)
+
         # add orientations to the galaxy table
-        table['galaxy_axisA_x'][:] = major_v[:, 0]
-        table['galaxy_axisA_y'][:] = major_v[:, 1]
-        table['galaxy_axisA_z'][:] = major_v[:, 2]
+        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
-        table['galaxy_axisB_x'][:] = inter_v[:, 0]
-        table['galaxy_axisB_y'][:] = inter_v[:, 1]
-        table['galaxy_axisB_z'][:] = inter_v[:, 2]
+        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
 
-        table['galaxy_axisC_x'][:] = minor_v[:, 0]
-        table['galaxy_axisC_y'][:] = minor_v[:, 1]
-        table['galaxy_axisC_z'][:] = minor_v[:, 2]
+        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+        return table
 
 
 class RadialSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_stregth=0):
+    def __init__(self, satellite_alignment_stregth=0.8):
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -145,18 +149,22 @@ class RadialSatelliteAlignment(object):
         # the intermediate axis is determined
         inter_v = vectors_normal_to_planes(major_v, minor_v)
 
+        mask = (table['gal_type'] == self.gal_type)
+
         # add orientations to the galaxy table
-        table['galaxy_axisA_x'][:] = major_v[:, 0]
-        table['galaxy_axisA_y'][:] = major_v[:, 1]
-        table['galaxy_axisA_z'][:] = major_v[:, 2]
+        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
-        table['galaxy_axisB_x'][:] = inter_v[:, 0]
-        table['galaxy_axisB_y'][:] = inter_v[:, 1]
-        table['galaxy_axisB_z'][:] = inter_v[:, 2]
+        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
 
-        table['galaxy_axisC_x'][:] = minor_v[:, 0]
-        table['galaxy_axisC_y'][:] = minor_v[:, 1]
-        table['galaxy_axisC_z'][:] = minor_v[:, 2]
+        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+        return table
 
 
 class MajorAxisSatelliteAlignment(object):
@@ -213,18 +221,22 @@ class MajorAxisSatelliteAlignment(object):
         # the intermediate axis is determined
         inter_v = vectors_normal_to_planes(major_v, minor_v)
 
+        mask = (table['gal_type'] == self.gal_type)
+
         # add orientations to the galaxy table
-        table['galaxy_axisA_x'][:] = major_v[:, 0]
-        table['galaxy_axisA_y'][:] = major_v[:, 1]
-        table['galaxy_axisA_z'][:] = major_v[:, 2]
+        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
-        table['galaxy_axisB_x'][:] = inter_v[:, 0]
-        table['galaxy_axisB_y'][:] = inter_v[:, 1]
-        table['galaxy_axisB_z'][:] = inter_v[:, 2]
+        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
 
-        table['galaxy_axisC_x'][:] = minor_v[:, 0]
-        table['galaxy_axisC_y'][:] = minor_v[:, 1]
-        table['galaxy_axisC_z'][:] = minor_v[:, 2]
+        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+        return table
 
 
 class HybridSatelliteAlignment(object):
@@ -310,18 +322,22 @@ class HybridSatelliteAlignment(object):
         # the intermediate axis is determined
         inter_v = vectors_normal_to_planes(major_v, minor_v)
 
+        mask = (table['gal_type'] == self.gal_type)
+
         # add orientations to the galaxy table
-        table['galaxy_axisA_x'][:] = major_v[:, 0]
-        table['galaxy_axisA_y'][:] = major_v[:, 1]
-        table['galaxy_axisA_z'][:] = major_v[:, 2]
+        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
-        table['galaxy_axisB_x'][:] = inter_v[:, 0]
-        table['galaxy_axisB_y'][:] = inter_v[:, 1]
-        table['galaxy_axisB_z'][:] = inter_v[:, 2]
+        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
 
-        table['galaxy_axisC_x'][:] = minor_v[:, 0]
-        table['galaxy_axisC_y'][:] = minor_v[:, 1]
-        table['galaxy_axisC_z'][:] = minor_v[:, 2]
+        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+        return table
 
 
 class DimrothWatson(rv_continuous):
