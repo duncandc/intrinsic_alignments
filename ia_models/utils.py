@@ -23,8 +23,9 @@ def halocat_to_galaxy_table(halocat):
 
     halo_id = halocat.halo_table['halo_id']
     halo_upid = halocat.halo_table['halo_upid']
+    host_id = halocat.halo_table['halo_hostid']
 
-    table = Table([halo_id, halo_upid], names=('halo_id', 'halo_upid'))
+    table = Table([halo_id, halo_upid, host_id], names=('halo_id', 'halo_upid', 'halo_hostid'))
     table['x'] = halocat.halo_table['halo_x']
     table['y'] = halocat.halo_table['halo_y']
     table['z'] = halocat.halo_table['halo_z']
@@ -62,6 +63,8 @@ def halocat_to_galaxy_table(halocat):
     table['halo_z'][inds1] = halocat.halo_table['halo_z'][inds2]
     table['halo_mvir'] = 0.0
     table['halo_mvir'][inds1] = halocat.halo_table['halo_mvir'][inds2]
+    table['halo_rvir'] = 0.0
+    table['halo_rvir'][inds1] = halocat.halo_table['halo_rvir'][inds2]
 
     table['halo_axisA_x'] = 0.0
     table['halo_axisA_x'][inds1] = halocat.halo_table['halo_axisA_x'][inds2]

@@ -108,7 +108,7 @@ class RadialSatelliteAlignment(object):
     alignment model for satellite galaxies
     """
 
-    def __init__(self, satellite_alignment_a1=1.0,  satellite_alignment_alpha1=0.0):
+    def __init__(self, satellite_alignment_a1=0.8,  satellite_alignment_alpha1=0.0):
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['inherit_halocat_properties', 'assign_orientation'])
@@ -145,7 +145,10 @@ class RadialSatelliteAlignment(object):
             halo_y = table['halo_y']
             halo_z = table['halo_z']
             halo_r = table['halo_rvir']
-            Lbox = self._Lbox
+            try:
+                Lbox = kwargs['Lbox']
+            except KeyError:
+                Lbox = self._Lbox
         else:
             halo_x = kwargs['halo_x']
             halo_y = kwargs['halo_z']
