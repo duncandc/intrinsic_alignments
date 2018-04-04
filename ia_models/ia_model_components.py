@@ -5,9 +5,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
-from intrinsic_alignments.ia_models.utils import random_perpendicular_directions, vectors_normal_to_planes, angles_between_list_of_vectors,\
-    rotation_matrices_from_angles, rotate_vector_collection
-from halotools.utils import normalized_vectors, vectors_between_list_of_vectors
+from intrinsic_alignments.ia_models.utils import random_perpendicular_directions
+from halotools.utils import normalized_vectors, vectors_between_list_of_vectors, vectors_normal_to_planes,\
+    angles_between_list_of_vectors, rotation_matrices_from_angles, rotate_vector_collection
 from scipy.stats import rv_continuous
 from scipy.special import erf, erfi, erfinv
 from scipy.optimize import minimize
@@ -19,23 +19,20 @@ __all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAl
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
-def power_law(x, a, alpha):
-    """
-    power law model
-    """
-    return a*x**alpha
-
-
 class CentralAlignment(object):
     r"""
     alignment model for central galaxies
     """
-    def __init__(self, central_alignment_stregth=0):
+    def __init__(self, central_alignment_stregth=1.0):
         r"""
         Parameters
         ----------
-        alignment_stregth : float
+        central_alignment_stregth : float
             [-1,1] bounded number indicating alignment strength
+
+        Notes
+        =====
+        If the kwargs or table contain a key "satellite_alignment_strength", this will be used instead.
         """
 
         self.gal_type = 'centrals'
@@ -70,8 +67,8 @@ class CentralAlignment(object):
             Az = table[self.list_of_haloprops_needed[2]]
         else:
             Ax = kwargs['halo_axisA_x']
-            Ay = kwargs['halo_axisA_z']
-            Az = kwargs['halo_axisA_y']
+            Ay = kwargs['halo_axisA_y']
+            Az = kwargs['halo_axisA_z']
 
         p = np.ones(len(Ax))*self.param_dict['central_alignment_strenth']
 
@@ -103,12 +100,95 @@ class CentralAlignment(object):
         return table
 
 
+class HaloMassCentralAlignmentStrength():
+    """
+    model for the stregth of alignment of centrals
+    """
+
+    def __init__(self, central_alignment_a=0.05, central_alignment_gamma=0.25):
+        """
+        Parameters
+        ==========
+        a : float
+
+        alpha : float
+        """
+
+        self.gal_type = 'centrals'
+        self._mock_generation_calling_sequence = (['assign_central_alignment_strength'])
+
+        self._galprop_dtypes_to_allocate = np.dtype([(str('central_alignment_strength'), 'f4')])
+
+        self.list_of_haloprops_needed = ['halo_mvir']
+
+        self._methods_to_inherit = (['assign_central_alignment_strength'])
+        self.param_dict = ({
+            'a': central_alignment_a,
+            'gamma': central_alignment_gamma})
+
+    def assign_central_alignment_strength(self, **kwargs):
+        """
+        Parameters
+        ==========
+        halo_mvir : array_like
+            host halo virial mass
+        """
+
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            halo_m = table['halo_mvir']
+        else:
+            halo_m = kwargs['halo_mvir']
+
+        s = self.alignment_strength_mass_dependence(halo_m)
+
+        if 'table' in kwargs.keys():
+            mask = (table['gal_type'] == self.gal_type)
+            table['central_alignment_strength'] = 0.0
+            table['central_alignment_strength'][mask] = s[mask]
+            return table
+        else:
+            return s
+
+    def alignment_strength_mass_dependence(self, m):
+        """
+        Parameters
+        ==========
+        m : array_like
+            scaled halo masses
+
+        Returns
+        =======
+        alignment_strength : numpy.array
+            array fo values bounded between [-1,1]
+        """
+
+        a = self.param_dict['a']
+        gamma = self.param_dict['gamma']
+        result = a*np.log10(m)+gamma
+        mask = (result < -0.99)
+        result[mask]= -0.99
+        mask = (result > 0.99)
+        result[mask]= 0.99
+        return result
+
+
 class RadialSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
 
-    def __init__(self, satellite_alignment_a1=0.8,  satellite_alignment_alpha1=0.0):
+    def __init__(self, satellite_alignment_strength=0.8, **kwargs):
+        """
+        Parameters
+        ==========
+        satellite_alignment_strength : float
+             parameter between [-1,1] that sets the alignment strength between perfect anti-alignment and perfect alignment
+
+        Notes
+        =====
+        If the kwargs or table contain a key "satellite_alignment_strength", this will be used instead.
+        """
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['inherit_halocat_properties', 'assign_orientation'])
@@ -120,13 +200,18 @@ class RadialSatelliteAlignment(object):
 
         self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_rvir']
 
+        # set default box size.
+        if 'Lbox' in kwargs.keys():
+            self._Lbox = kwargs['Lbox']
+        else:
+            self._Lbox = np.inf
+        # update Lbox if a halo catalog object is passed.
         self._additional_kwargs_dict = dict(inherit_halocat_properties=['Lbox'])
 
         self._methods_to_inherit = (
             ['assign_orientation', 'inherit_halocat_properties'])
         self.param_dict = ({
-            'satellite_alignment_a1': satellite_alignment_a1,
-            'satellite_alignment_alpha1': satellite_alignment_alpha1})
+            'satellite_alignment_strength': satellite_alignment_strength})
 
     def inherit_halocat_properties(self, seed=None, **kwargs):
         """
@@ -138,9 +223,183 @@ class RadialSatelliteAlignment(object):
         r"""
         assign a a set of three orthoganl unit vectors indicating the orientation
         of the galaxies' major, intermediate, and minor axis
+
+        Returns
+        =======
+        major_aixs, intermediate_axis, minor_axis :  numpy nd.arrays
+            arrays of galaxies' axies
         """
+
         if 'table' in kwargs.keys():
             table = kwargs['table']
+            try:
+                Lbox = kwargs['Lbox']
+            except KeyError:
+                Lbox = self._Lbox
+        else:
+            try:
+                Lbox = kwargs['Lbox']
+            except KeyError:
+                Lbox = self._Lbox
+
+        # calculate the radial vector between satellites and centrals
+        major_input_vectors = self.get_radial_vector(Lbox=Lbox, **kwargs)
+
+        # set major axis orientation
+        try:
+            p = table['satellite_alignment_strength']
+        except KeyError:
+            p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strength']
+        major_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
+
+        # randomly set minor axis orientation
+        minor_v = random_perpendicular_directions(major_v)
+
+        # the intermediate axis is determined
+        inter_v = vectors_normal_to_planes(major_v, minor_v)
+
+        if 'table' in kwargs.keys():
+            mask = (table['gal_type'] == self.gal_type)
+
+            # add orientations to the galaxy table
+            table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+            table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+            table['galaxy_axisA_z'][mask] = major_v[mask, 2]
+
+            table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+            table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+            table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
+
+            table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+            table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+            table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+            return table
+        else:
+            return major_v, inter_v, minor_v
+
+
+    def get_radial_vector(self, Lbox=None, **kwargs):
+        """
+        caclulate the radial vector for satellite galaxies
+
+        Parameters
+        ==========
+        x, y, z : array_like
+            galaxy positions
+
+        halo_x, halo_y, halo_z : array_like
+            host halo positions
+
+        halo_r : array_like
+            halo size
+
+        Lbox : array_like
+            array len(3) giving the simulation box size along each dimension
+
+        Returns
+        =======
+        r : numpy.array
+            array of radial vectors of shape (Ngal, 3) between host haloes and satellites
+        """
+
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            x = table['x']
+            y = table['y']
+            z = table['z']
+            halo_x = table['halo_x']
+            halo_y = table['halo_y']
+            halo_z = table['halo_z']
+        else:
+            x = kwargs['x']
+            y = kwargs['y']
+            z = kwargs['z']
+            halo_x = kwargs['halo_x']
+            halo_y = kwargs['halo_y']
+            halo_z = kwargs['halo_z']
+
+        if Lbox is None:
+            Lbox = self._Lbox
+
+        # define halo-center - satellite vector
+        dx = (x - halo_x)
+        mask = dx>Lbox[0]/2.0
+        dx[mask] = dx[mask] - Lbox[0]
+        mask = dx<-1.0*Lbox[0]/2.0
+        dx[mask] = dx[mask] + Lbox[0]
+
+        dy = (y - halo_y)
+        mask = dy>Lbox[1]/2.0
+        dy[mask] = dy[mask] - Lbox[1]
+        mask = dy<-1.0*Lbox[1]/2.0
+        dy[mask] = dy[mask] + Lbox[1]
+
+        dz = (z - halo_z)
+        mask = dz>Lbox[2]/2.0
+        dz[mask] = dz[mask] - Lbox[2]
+        mask = dz<-1.0*Lbox[2]/2.0
+        dz[mask] = dz[mask] + Lbox[2]
+
+        return np.vstack((dx, dy, dz)).T
+
+
+class RadialSatelliteAlignmentStrength():
+    """
+    model for the stregth of alignment of satellites
+    """
+
+    def __init__(self, satellite_alignment_a=1.0, satellite_alignment_gamma=1.0):
+        """
+        Parameters
+        ==========
+        a : float
+
+        alpha : float
+        """
+
+        self.gal_type = 'satellites'
+        self._mock_generation_calling_sequence = (['assign_satellite_alignment_strength'])
+
+        self._galprop_dtypes_to_allocate = np.dtype([(str('satellite_alignment_strength'), 'f4')])
+
+        self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_rvir']
+
+        self._additional_kwargs_dict = dict(inherit_halocat_properties=['Lbox'])
+
+        self._methods_to_inherit = (['assign_satellite_alignment_strength'])
+        self.param_dict = ({
+            'a': satellite_alignment_a,
+            'gamma': satellite_alignment_gamma})
+
+    def inherit_halocat_properties(self, **kwargs):
+        """
+        """
+        Lbox = kwargs['Lbox']
+        self._Lbox = Lbox
+
+    def assign_satellite_alignment_strength(self, **kwargs):
+        """
+        Parameters
+        ==========
+        x, y, z : array_like
+            galaxy positions
+
+        halo_x, halo_y, halo_z : array_like
+            host halo positions
+
+        halo_r : array_like
+            host halo virial radius
+
+        Lbox : array_like
+            size of simulation along each dimension
+        """
+
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            x = table['x']
+            y = table['y']
+            z = table['z']
             halo_x = table['halo_x']
             halo_y = table['halo_y']
             halo_z = table['halo_z']
@@ -150,79 +409,86 @@ class RadialSatelliteAlignment(object):
             except KeyError:
                 Lbox = self._Lbox
         else:
+            x = kwargs['x']
+            y = kwargs['y']
+            z = kwargs['z']
             halo_x = kwargs['halo_x']
-            halo_y = kwargs['halo_z']
-            halo_z = kwargs['halo_y']
+            halo_y = kwargs['halo_y']
+            halo_z = kwargs['halo_z']
             halo_r = kwargs['halo_rvir']
             Lbox = kwargs['Lbox']
 
-        #p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strenth']
-
         # define halo-center - satellite vector
-        dx = (table['x'] - halo_x)
+        dx = (x - halo_x)
         mask = dx>Lbox[0]/2.0
         dx[mask] = dx[mask] - Lbox[0]
         mask = dx<-1.0*Lbox[0]/2.0
         dx[mask] = dx[mask] + Lbox[0]
 
-        dy = (table['y'] - halo_y)
+        dy = (y - halo_y)
         mask = dy>Lbox[1]/2.0
-        dx[mask] = dy[mask] - Lbox[1]
+        dy[mask] = dy[mask] - Lbox[1]
         mask = dy<-1.0*Lbox[1]/2.0
-        dx[mask] = dy[mask] + Lbox[1]
+        dy[mask] = dy[mask] + Lbox[1]
 
-        dz = (table['z'] - halo_z)
+        dz = (z - halo_z)
         mask = dz>Lbox[2]/2.0
-        dx[mask] = dz[mask] - Lbox[2]
+        dz[mask] = dz[mask] - Lbox[2]
         mask = dz<-1.0*Lbox[2]/2.0
-        dx[mask] = dz[mask] + Lbox[2]
+        dz[mask] = dz[mask] + Lbox[2]
 
         # calculate scaled halo virial radius
         r = np.sqrt(dx**2 + dy**2 + dz**2)/halo_r
 
-        major_input_vectors = np.vstack((dx, dy, dz)).T
+        s = self.alignment_strength_radial_dependence(r)
 
-        # set major axis orientation
-        p = self.radial_satellite_alignment_strength(r)
-        major_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
+        if 'table' in kwargs.keys():
+            mask = (table['gal_type'] == self.gal_type)
+            table['satellite_alignment_strength'] = 0.0
+            table['satellite_alignment_strength'][mask] = s[mask]
+            return table
+        else:
+            return s
 
-        # randomly set minor axis orientation
-        minor_v = random_perpendicular_directions(major_v)
-
-        # the intermediate axis is determined
-        inter_v = vectors_normal_to_planes(major_v, minor_v)
-
-        mask = (table['gal_type'] == self.gal_type)
-
-        # add orientations to the galaxy table
-        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
-        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
-        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
-
-        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
-        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
-        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
-
-        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
-        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
-        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
-
-        return table
-
-    def radial_satellite_alignment_strength(self, r):
+    def alignment_strength_radial_dependence(self, r):
         """
-        strength of alignment as a function of scaled halo-centric radius
+        Parameters
+        ==========
+        r : array_like
+            scaled radial position
+
+        Returns
+        =======
+        alignment_strength : numpy.array
+            array fo values bounded between [-1,1]
         """
-        p = power_law(r, self.param_dict['satellite_alignment_a1'], self.param_dict['satellite_alignment_alpha1'])
-        p[p>=0.99]=0.99
-        return p
+
+        a = self.param_dict['a']
+        gamma = self.param_dict['gamma']
+        result = a*(1.0-1.0/(1.0+(1.0/r)**gamma))
+        mask = (result < -0.99)
+        result[mask]= -0.99
+        mask = (result > 0.99)
+        result[mask]= 0.99
+        return result
+
 
 
 class MajorAxisSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_a1=1.0,  satellite_alignment_alpha1=0.0):
+    def __init__(self, satellite_alignment_strength=0.8):
+        """
+        Parameters
+        ==========
+        satellite_alignment_strength : float
+             parameter between [-1,1] that sets the alignment strength between perfect anti-alignment and perfect alignment
+
+        Notes
+        =====
+        If the kwargs or table contain a key "satellite_alignment_strength", this will be used instead.
+        """
 
         self.gal_type = 'satellites'
         self._mock_generation_calling_sequence = (['assign_orientation'])
@@ -255,11 +521,11 @@ class MajorAxisSatelliteAlignment(object):
             Az = table[self.list_of_haloprops_needed[5]]
         else:
             halo_x = kwargs['halo_x']
-            halo_y = kwargs['halo_z']
-            halo_z = kwargs['halo_y']
+            halo_y = kwargs['halo_y']
+            halo_z = kwargs['halo_z']
             Ax = kwargs['halo_axisA_x']
-            Ay = kwargs['halo_axisA_z']
-            Az = kwargs['halo_axisA_y']
+            Ay = kwargs['halo_axisA_y']
+            Az = kwargs['halo_axisA_z']
 
         p = np.ones(len(Ax))*self.param_dict['satellite_alignment_strenth']
 
@@ -295,22 +561,19 @@ class HybridSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_a1=0.2, satellite_alignment_a2=0.8,
-        satellite_alignment_alpha1=-0.3, satellite_alignment_alpha2=-0.05):
+    def __init__(self, satellite_alignment_strength=0.8, satellite_alignment_hybridization_p=0.5):
         """
         Parameters
         ==========
-        satellite_alignment_a1 : float
-            power-law parameter for hybrid alignment vector
+        satellite_alignment_strength : float
+             parameter between [-1,1] that sets the alignment strength between perfect anti-alignment and perfect alignment
 
-        satellite_alignment_a2 : float
-            power-law parameter for alignment strength
+        satellite_alignment_hybridization_p : float
+            parameter between [0,1] that sets the hyrbid alignment vector between the radial and major axis.
 
-        satellite_alignment_alpha1 : float
-            power-law parameter for hybrid alignment vector
-
-        satellite_alignment_alpha2 : float
-            power-law parameter for alignment strength
+        Notes
+        =====
+        If the kwargs or table contain a key "satellite_alignment_strength", this will be used instead.
         """
 
         self.gal_type = 'satellites'
@@ -358,34 +621,34 @@ class HybridSatelliteAlignment(object):
             Lbox = self._Lbox
         else:
             halo_x = kwargs['halo_x']
-            halo_y = kwargs['halo_z']
-            halo_z = kwargs['halo_y']
+            halo_y = kwargs['halo_y']
+            halo_z = kwargs['halo_z']
             Ax = kwargs['halo_axisA_x']
-            Ay = kwargs['halo_axisA_z']
-            Az = kwargs['halo_axisA_y']
+            Ay = kwargs['halo_axisA_y']
+            Az = kwargs['halo_axisA_z']
             halo_r = kwargs['halo_rvir']
             Lbox = kwargs['Lbox']
 
         Ngal = len(Ax)
 
-        # define radial vector
-        dx = (table['x'] - halo_x)
-        mask = dx > Lbox[0]/2.0
+        # define halo-center - satellite vector
+        dx = (x - halo_x)
+        mask = dx>Lbox[0]/2.0
         dx[mask] = dx[mask] - Lbox[0]
-        mask = dx < -1.0*Lbox[0]/2.0
+        mask = dx<-1.0*Lbox[0]/2.0
         dx[mask] = dx[mask] + Lbox[0]
 
-        dy = (table['y'] - halo_y)
-        mask = dy > Lbox[1]/2.0
-        dx[mask] = dy[mask] - Lbox[1]
-        mask = dy < -1.0*Lbox[1]/2.0
-        dx[mask] = dy[mask] + Lbox[1]
+        dy = (y - halo_y)
+        mask = dy>Lbox[1]/2.0
+        dy[mask] = dy[mask] - Lbox[1]
+        mask = dy<-1.0*Lbox[1]/2.0
+        dy[mask] = dy[mask] + Lbox[1]
 
-        dz = (table['z'] - halo_z)
-        mask = dz > Lbox[2]/2.0
-        dx[mask] = dz[mask] - Lbox[2]
-        mask = dz < -1.0*Lbox[2]/2.0
-        dx[mask] = dz[mask] + Lbox[2]
+        dz = (z - halo_z)
+        mask = dz>Lbox[2]/2.0
+        dz[mask] = dz[mask] - Lbox[2]
+        mask = dz<-1.0*Lbox[2]/2.0
+        dz[mask] = dz[mask] + Lbox[2]
 
         # radial vector
         v1 = normalized_vectors(np.vstack((dx, dy, dz)).T)
