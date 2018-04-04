@@ -1,5 +1,5 @@
 r"""
-halotools model components for modelling central and scatellite alignments
+halotools model components for modelling central and scatellite intrinsic alignments
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
@@ -15,7 +15,7 @@ from scipy.optimize import minimize
 from warnings import warn
 
 
-__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment', 'DimrothWatson')
+__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment', 'DimrothWatson', 'HaloMassCentralAlignmentStrength', 'RadialSatelliteAlignmentStrength')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
@@ -23,17 +23,22 @@ class CentralAlignment(object):
     r"""
     alignment model for central galaxies
     """
-    def __init__(self, central_alignment_stregth=1.0):
+    def __init__(self, central_alignment_stregth=1.0, **kwargs):
         r"""
         Parameters
         ----------
-        central_alignment_stregth : float
+        central_alignment_strength : float
             [-1,1] bounded number indicating alignment strength
+
+        alignment_keys : list
+            A list of strings indicating the keywords for the x,y- and z components of the
+            halo alignment vector. Deafult is ['halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z'].
 
         Notes
         =====
-        If the kwargs or table contains a key "central_alignment_strength", this will be used instead
-        of `central_alignment_stregth` parameter
+        If the kwargs or table contains a key "central_alignment_strength", when populating a mock,
+        this will be used instead of `central_alignment_stregth` parameter passed during intialization.
+        This is how varying the alignment strength as a function of galaxy/halo properties is handeled.
         """
 
         self.gal_type = 'centrals'
@@ -44,20 +49,25 @@ class CentralAlignment(object):
              (str('galaxy_axisB_x'), 'f4'), (str('galaxy_axisB_y'), 'f4'), (str('galaxy_axisB_z'), 'f4'),
              (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
 
-        self.list_of_haloprops_needed = ['halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+        # specify the halo alignment vector
+        if 'alignment_keys' in kwargs.keys():
+            assert len(kwargs['alignment_keys'])==3
+            self.list_of_haloprops_needed = kwargs['alignment_keys']
+        else:
+            self.list_of_haloprops_needed = ['halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
 
         self._methods_to_inherit = (
-            ['assign_orientation'])
+            ['assign_central_orientation'])
         self.param_dict = ({
             'central_alignment_strenth': central_alignment_stregth})
 
-    def assign_orientation(self, **kwargs):
+    def assign_central_orientation(self, **kwargs):
         r"""
         Assign a a set of three orthoganl unit vectors indicating the orientation
         of the galaxies' major, intermediate, and minor axis
 
         Parameters
-        ----------
+        ==========
         halo_axisA_x, halo_axisA_y, halo_axisA_z :  array_like
              x,y,z components of halo alignment axis
 
@@ -96,7 +106,13 @@ class CentralAlignment(object):
         inter_v = vectors_normal_to_planes(major_v, minor_v)
 
         if 'table' in kwargs.keys():
-            mask = (table['gal_type'] == self.gal_type)
+            try:
+                mask = (table['gal_type'] == self.gal_type)
+            else:
+                mask = np.array([True]*len(table))
+                msg = ("`gal_type` not indicated in `table`.",
+                       "The orientation is being assigned for all galaxies in the `table`.")
+                print(msg)
 
             # add orientations to the galaxy table
             table['galaxy_axisA_x'][mask] = major_v[mask, 0]
@@ -199,7 +215,8 @@ class RadialSatelliteAlignment(object):
         Parameters
         ==========
         satellite_alignment_strength : float
-             parameter between [-1,1] that sets the alignment strength between perfect anti-alignment and perfect alignment
+             parameter between [-1,1] that sets the alignment strength between
+            perfect anti-alignment and perfect alignment
 
         Notes
         =====
@@ -280,7 +297,13 @@ class RadialSatelliteAlignment(object):
         inter_v = vectors_normal_to_planes(major_v, minor_v)
 
         if 'table' in kwargs.keys():
-            mask = (table['gal_type'] == self.gal_type)
+            try:
+                mask = (table['gal_type'] == self.gal_type)
+            else:
+                mask = np.array([True]*len(table))
+                msg = ("`gal_type` not indicated in `table`.",
+                       "The orientation is being assigned for all galaxies in the `table`.")
+                print(msg)
 
             # add orientations to the galaxy table
             table['galaxy_axisA_x'][mask] = major_v[mask, 0]
