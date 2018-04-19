@@ -15,7 +15,9 @@ from scipy.optimize import minimize
 from warnings import warn
 
 
-__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment', 'HybridSatelliteAlignment', 'DimrothWatson', 'HaloMassCentralAlignmentStrength', 'RadialSatelliteAlignmentStrength')
+__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment',
+           'HybridSatelliteAlignment', 'DimrothWatson',
+           'HaloMassCentralAlignmentStrength', 'RadialSatelliteAlignmentStrength')
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
@@ -63,7 +65,7 @@ class CentralAlignment(object):
 
     def assign_central_orientation(self, **kwargs):
         r"""
-        Assign a a set of three orthoganl unit vectors indicating the orientation
+        Assign a set of three orthoganl unit vectors indicating the orientation
         of the galaxies' major, intermediate, and minor axis
 
         Parameters
@@ -89,7 +91,7 @@ class CentralAlignment(object):
         # get alignment strength for each galaxy
         if 'table' in kwargs.keys():
             try:
-                p = table['satellite_alignment_strength']
+                p = table['central_alignment_strength']
             except KeyError:
                 p = np.ones(len(Ax))*self.param_dict['central_alignment_strenth']
         else:

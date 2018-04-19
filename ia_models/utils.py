@@ -8,10 +8,11 @@ from astropy.utils.misc import NumpyRNGContext
 from astropy.table import Table
 from halotools.utils import crossmatch
 
-__all__ = ('halocat_to_galaxy_table', 'random_perpendicular_directions', 'project_onto_plane', 'symmetrize_angular_distribution')
+__all__ = ('halocat_to_galaxy_table', 'random_perpendicular_directions',
+           'project_onto_plane', 'symmetrize_angular_distribution', 'pbc_radial_vector')
 
 
-__author__ = ('Andrew Hearin', )
+__author__ = ('Duncan Campbell', 'Andrew Hearin')
 
 
 def halocat_to_galaxy_table(halocat):
@@ -153,3 +154,57 @@ def symmetrize_angular_distribution(theta, radians=True):
         theta = np.degrees(theta)
 
     return result
+
+
+def pbc_radial_vector(coords1, coords2, Lbox):
+    """
+    Calulate the radial vector between 3D points, accounting for perodic boundary conditions (PBCs).
+
+    Paramaters
+    ==========
+    coords1 : array_like
+        array of shape (Npts, 3)
+
+    coords2 : array_like
+        array of shape (Npts, 3) defining centers
+
+    Lbox : array_like
+        array of shape (3,) indicating the PBCs
+
+    Returns
+    =======
+    d : numpy.array
+        array of shape (Npts, 3) of 3D radial vectors between points in `coords1` and `coords2`
+    """
+    
+    # points for which to calculate radial vectors given never coordinate centers
+    x1 = coords1[:,0]
+    y1 = coords1[:,1]
+    z1 = coords1[:,2]
+    
+    # coordinate centers
+    x2 = coords2[:,0]
+    y2 = coords2[:,1]
+    z2 = coords2[:,2]
+
+    dx = (x1 - x2)
+    mask = dx>Lbox[0]/2.0
+    dx[mask] = dx[mask] - Lbox[0]
+    mask = dx<-1.0*Lbox[0]/2.0
+    dx[mask] = dx[mask] + Lbox[0]
+
+    dy = (y1 - y2)
+    mask = dy>Lbox[1]/2.0
+    dy[mask] = dy[mask] - Lbox[1]
+    mask = dy<-1.0*Lbox[1]/2.0
+    dy[mask] = dy[mask] + Lbox[1]
+
+    dz = (z1 - z2)
+    mask = dz>Lbox[2]/2.0
+    dz[mask] = dz[mask] - Lbox[2]
+    mask = dz<-1.0*Lbox[2]/2.0
+    dz[mask] = dz[mask] + Lbox[2]
+
+    return np.vstack((dx, dy, dz)).T
+
+
