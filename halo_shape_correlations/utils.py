@@ -4,6 +4,7 @@ functions to facilitate analysis
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
+from scipy.stats import binned_statistic
 
 _all__ = ('empirical_cdf', 'binned_bootstrap_1d')
 
@@ -85,6 +86,10 @@ def binned_bootstrap_1d(x, values, bins, statistic='mean', Nboot=100):
 
     >>> mean_in_bins, err = binned_bootstrap_1D(x, values, bins, statistic='mean', Nboot=100)
     """
+
+    if Nboot==1:
+        result = binned_statistic(x, values, bins=bins, statstic=statistic)[0]
+        return result, np.zeros(len(result))
 
     edges = np.asarray(bins, float)
     nbin = len(edges) - 1
