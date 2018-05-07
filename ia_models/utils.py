@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
 from astropy.table import Table
-from halotools.utils import crossmatch
+from halotools.utils import crossmatch, elementwise_norm, elementwise_dot, normalized_vectors
 
 __all__ = ('halocat_to_galaxy_table', 'random_perpendicular_directions',
            'project_onto_plane', 'symmetrize_angular_distribution', 'pbc_radial_vector')

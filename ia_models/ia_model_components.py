@@ -69,7 +69,7 @@ class CentralAlignment(object):
             elif prim_gal_axis == possible_axis[1]: self.prim_gal_axis = 'B'
             elif prim_gal_axis == possible_axis[2]: self.prim_gal_axis = 'C'
         else:
-            msg = ('`prim_gal_axis` muyst be one of {0}, but instead is {1}.'.format(possible_axis, prim_gal_axis))
+            msg = ('`prim_gal_axis` must be one of {0}, but instead is {1}.'.format(possible_axis, prim_gal_axis))
             raise ValueError(msg)
 
         self._methods_to_inherit = (
@@ -116,24 +116,27 @@ class CentralAlignment(object):
         A_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
 
         # randomly set secondary axis orientation
-        B_v = random_perpendicular_directions(major_v)
+        B_v = random_perpendicular_directions(A_v)
 
         # the tertiary axis is determined
-        C_v = vectors_normal_to_planes(major_v, minor_v)
+        C_v = vectors_normal_to_planes(A_v, B_v)
 
         # depending on the prim_gal_axis, assign correlated axes
-        if self.prim_gal_axis is 'A':
+        if self.prim_gal_axis == 'A':
             major_v = A_v
             inter_v = B_v
             minor_v = C_v
-        elif self.prim_gal_axis is 'B':
+        elif self.prim_gal_axis == 'B':
             major_v = B_v
             inter_v = A_v
             minor_v = C_v
-        elif self.prim_gal_axis is 'C':
+        elif self.prim_gal_axis == 'C':
             major_v = B_v
             inter_v = C_v
             minor_v = A_v
+        else:
+            msg = ('primary galaxy axis {0} is not recognized.'.format(self.prim_gal_axis))
+            raise ValueError(msg)
 
         if 'table' in kwargs.keys():
             try:
@@ -328,29 +331,30 @@ class RadialSatelliteAlignment(object):
             try:
                 p = table['alignment_strength']
             except KeyError:
-                p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strength']
+                p = np.ones(len(table))*self.param_dict['satellite_alignment_strength']
         else:
-            p = np.ones(len(halo_x))*self.param_dict['satellite_alignment_strength']
+            N = len(self.param_dict['x'])
+            p = np.ones(N*self.param_dict['satellite_alignment_strength'])
 
         # set prim_gal_axis orientation
         A_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
 
         # randomly set secondary axis orientation
-        B_v = random_perpendicular_directions(major_v)
+        B_v = random_perpendicular_directions(A_v)
 
         # the tertiary axis is determined
-        C_v = vectors_normal_to_planes(major_v, minor_v)
+        C_v = vectors_normal_to_planes(A_v, B_v)
 
         # depending on the prim_gal_axis, assign correlated axes
-        if self.prim_gal_axis is 'A':
+        if self.prim_gal_axis == 'A':
             major_v = A_v
             inter_v = B_v
             minor_v = C_v
-        elif self.prim_gal_axis is 'B':
+        elif self.prim_gal_axis == 'B':
             major_v = B_v
             inter_v = A_v
             minor_v = C_v
-        elif self.prim_gal_axis is 'C':
+        elif self.prim_gal_axis == 'C':
             major_v = B_v
             inter_v = C_v
             minor_v = A_v
