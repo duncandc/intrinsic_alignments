@@ -25,7 +25,7 @@ class CentralAlignment(object):
     r"""
     alignment model for central galaxies
     """
-    def __init__(self, central_alignment_stregth=1.0, prim_gal_axis='major', **kwargs):
+    def __init__(self, central_alignment_strength=1.0, prim_gal_axis='major', **kwargs):
         r"""
         Parameters
         ----------
@@ -48,7 +48,7 @@ class CentralAlignment(object):
         """
 
         self.gal_type = 'centrals'
-        self._mock_generation_calling_sequence = (['assign_orientation'])
+        self._mock_generation_calling_sequence = (['assign_central_orientation'])
 
         self._galprop_dtypes_to_allocate = np.dtype(
             [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
@@ -75,7 +75,7 @@ class CentralAlignment(object):
         self._methods_to_inherit = (
             ['assign_central_orientation'])
         self.param_dict = ({
-            'central_alignment_strenth': central_alignment_stregth})
+            'central_alignment_strength': central_alignment_strength})
 
     def assign_central_orientation(self, **kwargs):
         r"""
@@ -107,9 +107,11 @@ class CentralAlignment(object):
             try:
                 p = table['central_alignment_strength']
             except KeyError:
-                p = np.ones(len(Ax))*self.param_dict['central_alignment_strenth']
+                msg = ('`central_alignment_strength` not detected in the table, using value in self.param_dict.')
+                warn(msg)
+                p = np.ones(len(Ax))*self.param_dict['central_alignment_strength']
         else:
-            p = np.ones(len(Ax))*self.param_dict['central_alignment_strenth']
+            p = np.ones(len(Ax))*self.param_dict['central_alignment_strength']
 
         # set prim_gal_axis orientation
         major_input_vectors = np.vstack((Ax, Ay, Az)).T
@@ -182,7 +184,7 @@ class HaloMassCentralAlignmentStrength():
         self.gal_type = 'centrals'
         self._mock_generation_calling_sequence = (['assign_central_alignment_strength'])
 
-        self._galprop_dtypes_to_allocate = np.dtype([(str('alignment_strength'), 'f4')])
+        self._galprop_dtypes_to_allocate = np.dtype([(str('central_alignment_strength'), 'f4')])
 
         self.list_of_haloprops_needed = ['halo_mvir']
 
@@ -209,8 +211,8 @@ class HaloMassCentralAlignmentStrength():
 
         if 'table' in kwargs.keys():
             mask = (table['gal_type'] == self.gal_type)
-            table['alignment_strength'] = 0.0
-            table['alignment_strength'][mask] = s[mask]
+            table['central_alignment_strength'] = 0.0
+            table['central_alignment_strength'][mask] = s[mask]
             return table
         else:
             return s
@@ -329,8 +331,10 @@ class RadialSatelliteAlignment(object):
         # get alignment strength for each galaxy
         if 'table' in kwargs.keys():
             try:
-                p = table['alignment_strength']
+                p = table['satellite_alignment_strength']
             except KeyError:
+                msg = ('`satellite_alignment_strength` not detected in the table, using value in self.param_dict.')
+                warn(msg)
                 p = np.ones(len(table))*self.param_dict['satellite_alignment_strength']
         else:
             N = len(self.param_dict['x'])
@@ -586,12 +590,16 @@ class MajorAxisSatelliteAlignment(object):
     r"""
     alignment model for satellite galaxies
     """
-    def __init__(self, satellite_alignment_strength=0.8):
+    def __init__(self, satellite_alignment_strength=0.8, prim_gal_axis='major', **kwargs):
         """
         Parameters
         ==========
         satellite_alignment_strength : float
              parameter between [-1,1] that sets the alignment strength between perfect anti-alignment and perfect alignment
+
+        prim_gal_axis :  string, optional
+            string indicating which galaxy principle axis is correlated with the halo alignment axis.
+            The options are: `major`, `intermediate`, and `minor`
 
         Notes
         =====
@@ -607,6 +615,16 @@ class MajorAxisSatelliteAlignment(object):
              (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
 
         self.list_of_haloprops_needed = ['halo_x', 'halo_y', 'halo_z', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+
+        # set which galaxy axis is correlated with the halo alignment vector
+        possible_axis = ['major', 'intermediate', 'minor']
+        if prim_gal_axis in possible_axis:
+            if prim_gal_axis == possible_axis[0]: self.prim_gal_axis = 'A'
+            elif prim_gal_axis == possible_axis[1]: self.prim_gal_axis = 'B'
+            elif prim_gal_axis == possible_axis[2]: self.prim_gal_axis = 'C'
+        else:
+            msg = ('`prim_gal_axis` muyst be one of {0}, but instead is {1}.'.format(possible_axis, prim_gal_axis))
+            raise ValueError(msg)
 
         self._methods_to_inherit = (
             ['assign_orientation'])
@@ -635,34 +653,69 @@ class MajorAxisSatelliteAlignment(object):
             Ay = kwargs['halo_axisA_y']
             Az = kwargs['halo_axisA_z']
 
-        p = np.ones(len(Ax))*self.param_dict['satellite_alignment_strenth']
-
-        # set major axis orientation
+        # get alignment strength for each galaxy
+        if 'table' in kwargs.keys():
+            try:
+                p = table['satellite_alignment_strength']
+            except KeyError:
+                msg = ('`satellite_alignment_strength` not detected in the table, using value in self.param_dict.')
+                warn(msg)
+                p = np.ones(len(table))*self.param_dict['satellite_alignment_strength']
+        else:
+            N = len(self.param_dict['x'])
+            p = np.ones(N*self.param_dict['satellite_alignment_strength'])
+        
+        # set halo alignment vector
         major_input_vectors = np.vstack((Ax, Ay, Az)).T
-        major_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
 
-        # randomly set minor axis orientation
-        minor_v = random_perpendicular_directions(major_v)
+        # set prim_gal_axis orientation
+        A_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
 
-        # the intermediate axis is determined
-        inter_v = vectors_normal_to_planes(major_v, minor_v)
+        # randomly set secondary axis orientation
+        B_v = random_perpendicular_directions(A_v)
 
-        mask = (table['gal_type'] == self.gal_type)
+        # the tertiary axis is determined
+        C_v = vectors_normal_to_planes(A_v, B_v)
 
-        # add orientations to the galaxy table
-        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
-        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
-        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
+        # depending on the prim_gal_axis, assign correlated axes
+        if self.prim_gal_axis == 'A':
+            major_v = A_v
+            inter_v = B_v
+            minor_v = C_v
+        elif self.prim_gal_axis == 'B':
+            major_v = B_v
+            inter_v = A_v
+            minor_v = C_v
+        elif self.prim_gal_axis == 'C':
+            major_v = B_v
+            inter_v = C_v
+            minor_v = A_v
 
-        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
-        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
-        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
+        if 'table' in kwargs.keys():
+            try:
+                mask = (table['gal_type'] == self.gal_type)
+            except KeyError:
+                mask = np.array([True]*len(table))
+                msg = ("`gal_type` not indicated in `table`.",
+                       "The orientation is being assigned for all galaxies in the `table`.")
+                print(msg)
 
-        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
-        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
-        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+            # add orientations to the galaxy table
+            table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+            table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+            table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
-        return table
+            table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+            table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+            table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
+
+            table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+            table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+            table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+            return table
+        else:
+            return major_v, inter_v, minor_v
 
 
 class HybridSatelliteAlignment(object):
@@ -782,8 +835,17 @@ class HybridSatelliteAlignment(object):
         # calculate scaled halo virial radius
         r = np.sqrt(dx**2 + dy**2 + dz**2)/halo_r
 
-        # get alignment radially dependent alignment strength
-        p = self.radial_satellite_alignment_strength(r)
+         # get alignment strength for each galaxy
+        if 'table' in kwargs.keys():
+            try:
+                p = table['satellite_alignment_strength']
+            except KeyError:
+                msg = ('`satellite_alignment_strength` not detected in the table, using value in self.param_dict.')
+                warn(msg)
+                p = np.ones(len(table))*self.param_dict['satellite_alignment_strength']
+        else:
+            N = len(self.param_dict['x'])
+            p = np.ones(N*self.param_dict['satellite_alignment_strength'])
 
         # get major to radial parameter
         a = self.radial_hybrid_alignment_vector_parameter(r)
@@ -990,7 +1052,7 @@ class DimrothWatson(rv_continuous):
         with np.errstate(over='ignore'):
             x = np.exp(k)
             inf_mask = np.array([False]*size)
-        edge_mask = (x == np.inf) | (x == 0.0)
+        edge_mask = ((x == np.inf) | (x == 0.0))
         result[edge_mask & (k>0)] = np.random.choice([1,-1], size=np.sum(edge_mask & (k>0)))
         result[edge_mask & (k<0)] = 0.0
 
