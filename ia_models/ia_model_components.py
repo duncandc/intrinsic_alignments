@@ -150,6 +150,12 @@ class CentralAlignment(object):
                 print(msg)
 
             # add orientations to the galaxy table
+
+            # check to see if the columns exist
+            for key in list(self._galprop_dtypes_to_allocate.names):
+                if key not in table.keys():
+                    table[key] = 0.0
+
             table['galaxy_axisA_x'][mask] = major_v[mask, 0]
             table['galaxy_axisA_y'][mask] = major_v[mask, 1]
             table['galaxy_axisA_z'][mask] = major_v[mask, 2]
@@ -263,7 +269,7 @@ class RadialSatelliteAlignment(object):
         """
 
         self.gal_type = 'satellites'
-        self._mock_generation_calling_sequence = (['inherit_halocat_properties', 'assign_orientation'])
+        self._mock_generation_calling_sequence = (['inherit_halocat_properties', 'assign_satellite_orientation'])
 
         self._galprop_dtypes_to_allocate = np.dtype(
             [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
@@ -302,7 +308,7 @@ class RadialSatelliteAlignment(object):
         Lbox = kwargs['Lbox']
         self._Lbox = Lbox
 
-    def assign_orientation(self, **kwargs):
+    def assign_satellite_orientation(self, **kwargs):
         r"""
         assign a a set of three orthoganl unit vectors indicating the orientation
         of the galaxies' major, intermediate, and minor axis
@@ -326,7 +332,17 @@ class RadialSatelliteAlignment(object):
                 Lbox = self._Lbox
 
         # calculate the radial vector between satellites and centrals
-        major_input_vectors = self.get_radial_vector(Lbox=Lbox, **kwargs)
+        major_input_vectors, r = self.get_radial_vector(Lbox=Lbox, **kwargs)
+
+        # check for length 0 radial vectors
+        mask = (r<=0.0) | (~np.isfinite(r))
+        if np.sum(mask)>0:
+            major_input_vectors[mask,0] = np.random.random((np.sum(mask)))
+            major_input_vectors[mask,1] = np.random.random((np.sum(mask)))
+            major_input_vectors[mask,2] = np.random.random((np.sum(mask)))
+            msg = ('{0} galaxies have a radial distance equal to zero (or infinity) from their host. '
+                   'These galaxies will be re-assigned random alignment vectors.'.format(int(np.sum(mask))))
+            warn(msg)
 
         # get alignment strength for each galaxy
         if 'table' in kwargs.keys():
@@ -342,6 +358,16 @@ class RadialSatelliteAlignment(object):
 
         # set prim_gal_axis orientation
         A_v = axes_correlated_with_input_vector(major_input_vectors, p=p)
+
+        # check for nan vectors
+        mask = (~np.isfinite(np.sum(np.prod(A_v, axis=-1))))
+        if np.sum(mask)>0:
+            A_v[mask,0] = np.random.random((np.sum(mask)))
+            A_v[mask,1] = np.random.random((np.sum(mask)))
+            A_v[mask,2] = np.random.random((np.sum(mask)))
+            msg = ('{0} correlated alignment axis(axes) were not found to be not finite. '
+                   'These will be re-assigned random vectors.'.format(int(np.sum(mask))))
+            warn(msg)
 
         # randomly set secondary axis orientation
         B_v = random_perpendicular_directions(A_v)
@@ -371,6 +397,11 @@ class RadialSatelliteAlignment(object):
                 msg = ("`gal_type` not indicated in `table`.",
                        "The orientation is being assigned for all galaxies in the `table`.")
                 print(msg)
+
+            # check to see if the columns exist
+            for key in list(self._galprop_dtypes_to_allocate.names):
+                if key not in table.keys():
+                    table[key] = 0.0
 
             # add orientations to the galaxy table
             table['galaxy_axisA_x'][mask] = major_v[mask, 0]
@@ -410,8 +441,11 @@ class RadialSatelliteAlignment(object):
 
         Returns
         =======
-        r : numpy.array
+        r_vec : numpy.array
             array of radial vectors of shape (Ngal, 3) between host haloes and satellites
+
+        r : numpy.array
+            radial distance
         """
 
         if 'table' in kwargs.keys():
@@ -453,7 +487,10 @@ class RadialSatelliteAlignment(object):
         mask = dz<-1.0*Lbox[2]/2.0
         dz[mask] = dz[mask] + Lbox[2]
 
-        return np.vstack((dx, dy, dz)).T
+        r_vec = np.vstack((dx, dy, dz)).T
+        r = np.sqrt(np.sum(r_vec*r_vec, axis=-1))
+
+        return r_vec, r
 
 
 class RadialSatelliteAlignmentStrength():
