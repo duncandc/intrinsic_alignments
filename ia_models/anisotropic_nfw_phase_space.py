@@ -194,7 +194,7 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
     r"""
     sub-class of NFWPhaseSpace
     """
-    def __init__(self, **kwargs):
+    def __init__(self, anisotropy_bias=1.0, **kwargs):
         r"""
         Parameters
         ----------
@@ -232,13 +232,21 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
             The spacing of this array sets a limit on how accurately the
             concentration parameter can be recovered in a likelihood analysis.
 
+        anisotropy_bias : np.float, optional
+            a float between math:`[0,\infty]` indicating the axis ratio response of the satellite distribution
+            relative to the halo axis ratios.
+
         Examples
         --------
         >>> model = AnisotropicNFWPhaseSpace()
         """
 
         super(AnisotropicNFWPhaseSpace, self).__init__(**kwargs)
-        self.list_of_haloprops_needed = ['halo_b_to_a', 'halo_c_to_a', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+        self.list_of_haloprops_needed = ['halo_b_to_a', 'halo_c_to_a',
+                                         'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
+
+        self.param_dict = ({
+            'anisotropy_bias': anisotropy_bias})
 
     def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4),
             conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
@@ -312,8 +320,11 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
         halo_axisA_z = np.zeros(Ngals) + halo_axisA_z
         rvir = NFWProfile.halo_mass_to_halo_radius(self, total_mass=m)
 
+
+        new_b_to_a, new_c_to_a = self.anisotropy_bias_response(b_to_a, c_to_a)
+
         x, y, z = self.mc_halo_centric_pos(c,
-            halo_radius=rvir, b_to_a=b_to_a, c_to_a=c_to_a,
+            halo_radius=rvir, b_to_a=new_b_to_a, c_to_a=new_c_to_a,
             halo_axisA_x=halo_axisA_x,
             halo_axisA_y=halo_axisA_y,
             halo_axisA_z=halo_axisA_z, seed=seed)
@@ -341,5 +352,13 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
             'radial_position': r, 'radial_velocity': vrad})
 
         return t
+
+    def anisotropy_bias_response(self, b_to_a, c_to_a):
+        """
+        return new axis ratios
+        """
+        beta = self.param_dict['anisotropy_bias']
+        return b_to_a**beta, c_to_a**beta
+
 
 

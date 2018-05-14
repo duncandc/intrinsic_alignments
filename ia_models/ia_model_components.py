@@ -297,7 +297,7 @@ class RadialSatelliteAlignment(object):
         self._additional_kwargs_dict = dict(inherit_halocat_properties=['Lbox'])
 
         self._methods_to_inherit = (
-            ['assign_orientation', 'inherit_halocat_properties'])
+            ['assign_satellite_orientation', 'inherit_halocat_properties'])
         self.param_dict = ({
             'satellite_alignment_strength': satellite_alignment_strength})
 
@@ -701,7 +701,7 @@ class MajorAxisSatelliteAlignment(object):
         else:
             N = len(self.param_dict['x'])
             p = np.ones(N*self.param_dict['satellite_alignment_strength'])
-        
+
         # set halo alignment vector
         major_input_vectors = np.vstack((Ax, Ay, Az)).T
 

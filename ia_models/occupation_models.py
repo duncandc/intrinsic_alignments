@@ -32,7 +32,7 @@ class SubHaloPositions():
         assign satellite positions based on subhalo positions.
         """
 
-        
+
         if 'table' in kwargs.keys():
             table = kwargs['table']
             halo_id = table['halo_id']
@@ -44,7 +44,7 @@ class SubHaloPositions():
             halo_x = kwargs['halo_x']
             halo_y = kwargs['halo_y']
             halo_z = kwargs['halo_z']
-        
+
         # get satellite positions
         x = halo_x*1.0
         y = halo_y*1.0
@@ -81,7 +81,7 @@ class SubHaloPositions():
 
         centrals = (upid == -1)
         satellites = (upid != -1)
-        
+
         if 'table' in kwargs.keys():
             # assign galaxy type
             table['gal_type'] = 'satellites'
@@ -147,13 +147,13 @@ class IsotropicSubhaloPositions():
                 Lbox = kwargs['Lbox']
             except KeyError:
                 Lbox = self._Lbox
-        
+
         # get subhalo positions
         x = halo_x*1.0
         y = halo_y*1.0
         z = halo_z*1.0
 
-        # get host halo positions 
+        # get host halo positions
         inds1, inds2 = crossmatch(halo_hostid, halo_id)
         # x-position
         halo_x[inds1] = halo_x[inds2]
@@ -179,7 +179,7 @@ class IsotropicSubhaloPositions():
         xx = halo_x + xx
         yy = halo_y + yy
         zz = halo_z + zz
-        
+
         # account for PBCs
         mask = (xx < 0.0)
         xx[mask] = xx[mask] + Lbox[0]
@@ -203,7 +203,7 @@ class IsotropicSubhaloPositions():
                 msg = ("`gal_type` not indicated in `table`.",
                        "The orientation is being assigned for all galaxies in the `table`.")
                 print(msg)
-            
+
             table['x'] = halo_x*1.0
             table['y'] = halo_y*1.0
             table['z'] = halo_z*1.0
@@ -227,7 +227,7 @@ class IsotropicSubhaloPositions():
     	"""
         specify central and satellites
     	"""
-        
+
         if 'table' in kwargs.keys():
             table = kwargs['table']
             upid = table['halo_upid']
@@ -237,7 +237,7 @@ class IsotropicSubhaloPositions():
 
         centrals = (upid == -1)
         satellites = (upid != -1)
-        
+
         if 'table' in kwargs.keys():
             # assign galaxy type
             table['gal_type'] = 'satellites'
@@ -306,13 +306,13 @@ class SemiIsotropicSubhaloPositions():
                 Lbox = kwargs['Lbox']
             except KeyError:
                 Lbox = self._Lbox
-        
+
         # get subhalo positions
         x = halo_x*1.0
         y = halo_y*1.0
         z = halo_z*1.0
 
-        # get host halo positions 
+        # get host halo positions
         inds1, inds2 = crossmatch(halo_hostid, halo_id)
         # x-position
         halo_x[inds1] = halo_x[inds2]
@@ -348,7 +348,7 @@ class SemiIsotropicSubhaloPositions():
         xx = halo_x + xx
         yy = halo_y + yy
         zz = halo_z + zz
-        
+
         # account for PBCs
         mask = (xx < 0.0)
         xx[mask] = xx[mask] + Lbox[0]
@@ -372,7 +372,7 @@ class SemiIsotropicSubhaloPositions():
                 msg = ("`gal_type` not indicated in `table`.",
                        "The orientation is being assigned for all galaxies in the `table`.")
                 print(msg)
-            
+
             table['x'] = halo_x*1.0
             table['y'] = halo_y*1.0
             table['z'] = halo_z*1.0
@@ -396,7 +396,7 @@ class SemiIsotropicSubhaloPositions():
         """
         specify central and satellites
         """
-        
+
         if 'table' in kwargs.keys():
             table = kwargs['table']
             upid = table['halo_upid']
@@ -406,7 +406,7 @@ class SemiIsotropicSubhaloPositions():
 
         centrals = (upid == -1)
         satellites = (upid != -1)
-        
+
         if 'table' in kwargs.keys():
             # assign galaxy type
             table['gal_type'] = 'satellites'
@@ -446,3 +446,4 @@ def radial_distance(x, y, z, halo_x, halo_y, halo_z, Lbox):
         r = np.sqrt(dx**2+dy**2+dz**2)
 
         return np.vstack((dx, dy, dz)).T, r
+
