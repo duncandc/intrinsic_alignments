@@ -156,7 +156,7 @@ def symmetrize_angular_distribution(theta, radians=True):
     return result
 
 
-def pbc_radial_vector(coords1, coords2, Lbox):
+def pbc_radial_vector(coords1, coords2, Lbox=None):
     """
     Calulate the radial vector between 3D points, accounting for perodic boundary conditions (PBCs).
 
@@ -177,7 +177,16 @@ def pbc_radial_vector(coords1, coords2, Lbox):
         array of shape (Npts, 3) of 3D radial vectors between points in `coords1` and `coords2`
     """
     
-    # points for which to calculate radial vectors given never coordinate centers
+    # process Lbox argument
+    if Lbox is None:
+        Lbox = np.array([np.inf]*3)
+    else:
+        Lbox = np.atleast_1D(Lbox)
+
+    if len(Lbox)==1:
+        Lbox = np.array([Lbox[0]]*3)
+    
+    # points for which to calculate radial vectors
     x1 = coords1[:,0]
     y1 = coords1[:,1]
     z1 = coords1[:,2]
@@ -187,6 +196,7 @@ def pbc_radial_vector(coords1, coords2, Lbox):
     y2 = coords2[:,1]
     z2 = coords2[:,2]
 
+    # account for PBCs
     dx = (x1 - x2)
     mask = dx>Lbox[0]/2.0
     dx[mask] = dx[mask] - Lbox[0]
