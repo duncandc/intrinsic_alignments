@@ -89,7 +89,7 @@ class DimrothWatson(rv_continuous):
         norm = np.zeros(len(k))
 
         # for k>0
-        norm[positive_k] = 4.0*np.sqrt(np.pi)*erf(np.sqrt(k[non_zero_k]))/(4.0*np.sqrt(k[non_zero_k]))
+        norm[positive_k] = 4.0*np.sqrt(np.pi)*erf(np.sqrt(k[positive_k]))/(4.0*np.sqrt(k[positive_k]))
         # for k<0
         norm[negative_k] = 4.0*np.sqrt(np.pi)*erfi(np.sqrt(k[negative_k]))/(4.0*np.sqrt(k[negative_k]))
 
