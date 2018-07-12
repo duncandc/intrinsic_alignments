@@ -6,7 +6,7 @@ import numpy as np
 from scipy.integrate import quad
 
 
-from ..ia_model_components import DimrothWatson
+from ..watson_distribution import DimrothWatson
 
 
 def test_pdf():
