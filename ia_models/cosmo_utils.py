@@ -10,7 +10,7 @@ from hmf import growth_factor
 
 # define default cosology for utilities
 from astropy.cosmology import FlatLambdaCDM
-default_cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+default_cosmo = FlatLambdaCDM(H0=70, Om0=0.3, Ob0=0.05, Tcmb0=2.7255)
 
 
 def mean_density(z, cosmo=None):
