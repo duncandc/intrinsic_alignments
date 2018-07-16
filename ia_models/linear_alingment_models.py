@@ -8,73 +8,13 @@ import numpy as np
 from scipy.interpolate import interp1d
 from pyfftlog.pyfftlog import pk2xi
 import scipy.integrate as integrate
-from intrinsic_alignments.ia_models.cosmo_utils import default_cosmo, linear_growth_factor, mean_density
+from intrinsic_alignments.ia_models.cosmo_utils import default_cosmo, linear_growth_factor, mean_density, linear_power_spectrum
 
 
-def linear_power_spectrum(z, cosmo=None, lmax=2500, minkh=1e-4, maxkh=1, npoints=200):
-    """
-    Return a tabulated linear power spectrum, :math:`P(k)`.
-
-    Parameters
-    ==========
-    z : float
-        redshift for power spectrum
-
-    cosmo : astropy.cosmology object
-        if 'None', the default cosmology defined in cosmo_utils.py is used.
-
-    Returns
-    =======
-    k : numpy.array
-        tabulated values of k
-
-    pk : numpy.array
-        power spectrum at the specified k
-    """
-
-    # check to see if cosmology was passed
-    if cosmo is None:
-        cosmo = default_cosmo
-
-    # redshift input for CAMB power spectrum must be a vector
-    z = np.atleast_1d(z)
-    # but this function is written for single values of the redshift
-    if len(z)>1:
-        msg = ('`z` parameter must be a float')
-        raise ValueError(msg)
-
-    # set up CAMB
-    pars = camb.CAMBparams()
-    pars.set_cosmology(H0=cosmo.H0.value,
-                       ombh2=cosmo.Ob0 * cosmo.h ** 2,
-                       omch2=(cosmo.Om0 - cosmo.Ob0) * cosmo.h ** 2,
-                       omk=cosmo.Ok0,
-                       nnu=cosmo.Neff,
-                       standard_neutrino_neff=cosmo.Neff,
-                       TCMB=cosmo.Tcmb0.value)
-    pars.InitPower.set_params(ns=0.965, r=0)
-    pars.set_for_lmax(lmax, lens_potential_accuracy=0)
-
-    # calculate results for these parameters
-    results = camb.get_results(pars)
-
-    # note the non-linear corrections couple to small scales
-    pars.set_matter_power(redshifts=z, kmax=maxkh*2)
-
-    # retreive linear spectrum
-    pars.NonLinear = camb.model.NonLinear_none
-    results = camb.get_results(pars)
-    kh, z, pk = results.get_matter_power_spectrum(minkh=minkh,
-                                                  maxkh=maxkh,
-                                                  npoints=npoints)
-
-    return kh, pk[0]
-
-
-def P_II_factor(z, cosmo=None):
+def factor_PII(z, cosmo=None):
     """
     Return the II linear power spectrum multiplicative factor.
-    See Bridle & King (2007) eq. 6.
+    See Bridle & King (2007), eq. 6.
 
     Paramaters
     ==========
@@ -82,6 +22,7 @@ def P_II_factor(z, cosmo=None):
         redshift
 
     cosmo : astropy.cosmology object
+        if 'None', the default cosmology defined in cosmo_utils.py is used.
 
     Returns
     =======
@@ -96,8 +37,80 @@ def P_II_factor(z, cosmo=None):
     return (C_1*mean_density(z, cosmo)/((1.0+z)*linear_growth_factor(z, cosmo)))**2
 
 
-def ii_plus(r, z, cosmo=None, ptype='linear'):
+def factor_PGI(z, cosmo=None):
     """
+    Return the GI linear power spectrum multiplicative factor.
+    See Bridle & King (2007), eq. 11.
+
+    Paramaters
+    ==========
+    z : array_like
+        redshift
+
+    cosmo : astropy.cosmology object
+        if 'None', the default cosmology defined in cosmo_utils.py is used.
+
+    Returns
+    =======
+    A : float
+        power spectrum factor
+    """
+
+    if cosmo is None:
+        cosmo = default_cosmo
+
+    C_1 = 5*10**(-14)
+    return -1.0*(C_1*mean_density(z, cosmo)/((1.0+z)*linear_growth_factor(z, cosmo)))
+
+
+def xi_gg(r, z, cosmo=None):
+    """
+    Return the linear 3-D galaxy-galaxy clustering corrleation function, :math:`xi(r)`.
+
+    Paramaters
+    ==========
+    r : array_like
+        array of radial distances
+
+    z : array_like
+        redshift
+
+    cosmo : astropy.cosmology object
+        if 'None', the default cosmology defined in cosmo_utils.py is used.
+
+    Returns
+    =======
+    xi : numpy.array
+        linear galaxy-galaxy correlation function.
+    """
+
+    if cosmo is None:
+        cosmo = default_cosmo
+
+    kh, pk = linear_power_spectrum(z, cosmo=cosmo)
+    tabulated_r, tabulated_xi = pk2xi(kh, pk)
+
+    # interpolate between tabulated r and xi
+    f_xi = interp1d(tabulated_r, tabulated_xi, fill_value='extrapolate')
+
+    return f_xi(r), (kh, pk)
+
+
+def ii_plus(r, z, cosmo=None):
+    """
+    Paramaters
+    ==========
+    r : array_like
+        array of radial distances
+
+    z : array_like
+        redshift
+
+    cosmo : astropy.cosmology object
+        if 'None', the default cosmology defined in cosmo_utils.py is used.
+
+    Returns
+    =======
     """
 
     if cosmo is None:
@@ -107,29 +120,44 @@ def ii_plus(r, z, cosmo=None, ptype='linear'):
     tabulated_r, tabulated_xi = pk2xi(kh, pk)
 
     # interpolate between r and xi
-    f_xi = interp1d(tabulated_r, tabulated_xi*P_II_factor(z, cosmo=cosmo), fill_value='extrapolate')
+    f_xi = interp1d(tabulated_r, tabulated_xi*factor_PII(z, cosmo=cosmo), fill_value='extrapolate')
 
     return f_xi(r)
 
 
-def ii_plus_projected(rp, z, pi_max=60.0, cosmo=None, ptype='linear'):
+def ii_plus_projected(rp, z, pi_max=60.0, cosmo=None):
     """
+    Paramaters
+    ==========
+    r : array_like
+        array of projected radial distances
+
+    z : array_like
+        redshift
+
+    pi_max : float
+
+    cosmo : astropy.cosmology object
+        if 'None', the default cosmology defined in cosmo_utils.py is used.
+
+    Returns
+    =======
     """
 
     if cosmo is None:
         cosmo = default_cosmo
 
     # get interpolated integrand
-    r = np.logspace(np.min(rp), np.sqrt(pi_max**2 + np.max(rp)**2), 100)
-    xi = ii_plus(r, z, cosmo=cosmo, ptype=ptype)
+    r = np.logspace(np.log10(np.min(rp)), np.log10(np.sqrt(pi_max**2 + np.max(rp)**2)), 100)
+    xi = ii_plus(r, z, cosmo=cosmo)
     # interpolate between r and xi
     f_xi = interp1d(r, xi, fill_value='extrapolate')
 
     def integrand(x, y, z):
         r = np.sqrt(x*x + y*y)
-        return 2*(f_xi(r))
+        return 2.0*(f_xi(r))
 
-    # integrate for each value of rp
+    # integrate for each value of rp between pi=[0,pi_max].
     N = len(rp)
     result = np.zeros(N)
     for i in range(0, N):
