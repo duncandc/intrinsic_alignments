@@ -8,7 +8,13 @@ import numpy as np
 from scipy.interpolate import interp1d
 from pyfftlog.pyfftlog import pk2xi
 import scipy.integrate as integrate
-from intrinsic_alignments.ia_models.cosmo_utils import default_cosmo, linear_growth_factor, mean_density, linear_power_spectrum
+from intrinsic_alignments.ia_models.cosmo_utils import linear_growth_factor, mean_density, linear_power_spectrum
+
+from intrinsic_alignments.ia_models.cosmo_utils import default_cosmo
+
+
+__author__=['Duncan Campbell']
+__all__=['factor_PII', 'factor_PGI', 'xi_gg', 'ii_plus', 'ii_plus_projected']
 
 
 def factor_PII(z, cosmo=None):
@@ -98,6 +104,9 @@ def xi_gg(r, z, cosmo=None):
 
 def ii_plus(r, z, cosmo=None):
     """
+    Return the intrinsic–intrinsic (II) ellitpicity correlation function,
+    :math:`\xi_{++}`.
+
     Paramaters
     ==========
     r : array_like
@@ -127,6 +136,9 @@ def ii_plus(r, z, cosmo=None):
 
 def ii_plus_projected(rp, z, pi_max=60.0, cosmo=None):
     """
+    Return the projected intrinsic–intrinsic (II) ellitpicity correlation function,
+    :math:`w_{++}`.
+
     Paramaters
     ==========
     r : array_like
