@@ -1,4 +1,5 @@
-"""
+# -*- coding: utf-8 -*-
+r"""
 linear models for intrinsic alignments
 """
 
@@ -6,9 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import camb
 import numpy as np
 from scipy.interpolate import interp1d
-from pyfftlog.pyfftlog import pk2xi
+from pyfftlog.pyfftlog import pk2xi, call_transform
 import scipy.integrate as integrate
-from intrinsic_alignments.ia_models.cosmo_utils import linear_growth_factor, mean_density, linear_power_spectrum
+from intrinsic_alignments.ia_models.cosmo_utils import linear_growth_factor, mean_density, linear_power_spectrum, nonlinear_power_spectrum
 
 from intrinsic_alignments.ia_models.cosmo_utils import default_cosmo
 
@@ -17,13 +18,40 @@ __author__=['Duncan Campbell']
 __all__=['LinearAlignmentModel', 'NonLinearAlignmentModel']
 
 
-class LinearAlignmentModel(object):
+def pk2xi_0(k, pk):
+    r""" 
     """
+
+    (r, xi) = call_transform(0, 2, k, pk, tdir=-1)
+
+    return (r, xi)
+
+
+def pk2xi_2(k, pk):
+    r""" 
+    """
+
+    (r, xi) = call_transform(2, 2, k, pk, tdir=-1)
+
+    return (r, xi)
+
+
+def pk2xi_4(k, pk):
+    r""" 
+    """
+
+    (r, xi) = call_transform(4, 2, k, pk, tdir=-1)
+
+    return (r, xi)
+
+
+class LinearAlignmentModel(object):
+    r"""
     Linear Intrinsic Alignment Model (LA)
     """
 
     def __init__(self, z=0.0, cosmo=None, **kwargs):
-        """
+        r"""
         Paramaters
         ==========
         z : float
@@ -37,15 +65,15 @@ class LinearAlignmentModel(object):
             cosmo = default_cosmo
 
         self.cosmo=cosmo
+        self.z = z
 
         # get power spectrum
         kh, pk = linear_power_spectrum(z, cosmo=cosmo)
-        tabulated_r, tabulated_xi = pk2xi(kh, pk)
-        self.power_spectrum = (tabulated_r, tabulated_xi)
+        self.power_spectrum = (kh, pk)
 
 
     def factor_PII(self):
-        """
+        r"""
         Return the II linear power spectrum multiplicative factor.
         See Bridle & King (2007), eq. 6.
 
@@ -60,7 +88,7 @@ class LinearAlignmentModel(object):
 
 
     def factor_PGI(self):
-        """
+        r"""
         Return the GI linear power spectrum multiplicative factor.
         See Bridle & King (2007), eq. 11.
 
@@ -75,7 +103,7 @@ class LinearAlignmentModel(object):
 
 
     def xi_gg(self, r):
-        """
+        r"""
         Return the linear 3-D galaxy-galaxy clustering corrleation function, :math:`xi(r)`.
 
         Paramaters
@@ -90,7 +118,7 @@ class LinearAlignmentModel(object):
         """
 
         kh, pk = self.power_spectrum
-        tabulated_r, tabulated_xi = pk2xi(kh, pk)
+        tabulated_r, tabulated_xi = pk2xi_0(kh, pk)
 
         # interpolate between tabulated r and xi
         f_xi = interp1d(tabulated_r, tabulated_xi, fill_value='extrapolate')
@@ -99,9 +127,8 @@ class LinearAlignmentModel(object):
 
 
     def ii_plus(self, r):
-        """
-        Return the intrinsic–intrinsic (II) ellitpicity correlation function,
-        :math:`\xi_{++}`.
+        r"""
+        Return the intrinsic–intrinsic (II) ellitpicity correlation function, :math:`\xi_{++}(r)`.
 
         Paramaters
         ==========
@@ -113,16 +140,40 @@ class LinearAlignmentModel(object):
         """
 
         kh, pk = self.power_spectrum
-        tabulated_r, tabulated_xi = pk2xi(kh, pk)
+        tabulated_r, tabulated_xi_0 = pk2xi_0(kh, pk)
+        tabulated_r, tabulated_xi_4 = pk2xi_4(kh, pk)
 
         # interpolate between r and xi
-        f_xi = interp1d(tabulated_r, tabulated_xi*self.factor_PII(), fill_value='extrapolate')
+        f_xi = interp1d(tabulated_r, (tabulated_xi_0+tabulated_xi_4)*self.factor_PII(), fill_value='extrapolate')
 
         return f_xi(r)
 
 
-    def ii_plus_projected(rp, z, pi_max=60.0, cosmo=None):
+    def ii_cross(self, r):
+        r"""
+        Return the intrinsic–intrinsic (II) ellitpicity correlation function, :math:`\xi_{xx}(r)`.
+
+        Paramaters
+        ==========
+        r : array_like
+            array of radial distances
+
+        Returns
+        =======
         """
+
+        kh, pk = self.power_spectrum
+        tabulated_r, tabulated_xi_0 = pk2xi_0(kh, pk)
+        tabulated_r, tabulated_xi_4 = pk2xi_4(kh, pk)
+
+        # interpolate between r and xi
+        f_xi = interp1d(tabulated_r, (tabulated_xi_0-tabulated_xi_4)*self.factor_PII(), fill_value='extrapolate')
+
+        return f_xi(r)
+
+
+    def ii_plus_projected(self, rp, pi_max=60.0, cosmo=None):
+        r"""
         Return the projected intrinsic–intrinsic (II) ellitpicity correlation function,
         :math:`w_{++}`.
 
@@ -163,7 +214,7 @@ class LinearAlignmentModel(object):
 
 
 class NonLinearAlignmentModel(LinearAlignmentModel):
-    """
+    r"""
     Non-Linear Intrinsic Alignment Model (NLA)
     """
 
@@ -181,10 +232,9 @@ class NonLinearAlignmentModel(LinearAlignmentModel):
         LinearAlignmentModel.__init__(self)
 
         # get power spectrum
-        #kh, pk = nonlinear_power_spectrum(z, cosmo=cosmo)
-        kh, pk = linear_power_spectrum(z, cosmo=cosmo)
-        tabulated_r, tabulated_xi = pk2xi(kh, pk)
-        self.power_spectrum = (tabulated_r, tabulated_xi)
+        kh, pk = nonlinear_power_spectrum(z, cosmo=cosmo)
+        self.power_spectrum = (kh, pk)
+
 
 
 

@@ -9,7 +9,7 @@ from astropy import constants as const
 from hmf import growth_factor
 import camb
 
-__all__=('mean_density', 'linear_growth_factor', 'linear_power_spectrum', 'astropy_to_camb_cosmo')
+__all__=('mean_density', 'linear_growth_factor', 'linear_power_spectrum', 'nonlinear_power_spectrum' 'astropy_to_camb_cosmo')
 __author__=('Duncan Campbell')
 
 # define a default cosology for utilities
@@ -119,6 +119,62 @@ def linear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-5, maxkh=100, npoin
 
     # retreive the linear spectrum
     pars.NonLinear = camb.model.NonLinear_none
+    results = camb.get_results(pars)
+    kh, z, pk = results.get_matter_power_spectrum(minkh=minkh,
+                                                  maxkh=maxkh,
+                                                  npoints=npoints)
+
+    return kh, pk[0]
+
+
+def nonlinear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-5, maxkh=100, npoints=1000):
+    """
+    Return a tabulated non-linear power spectrum, :math:`P(k)`.
+
+    Parameters
+    ==========
+    z : float
+        redshift for power spectrum
+
+    cosmo : astropy.cosmology object
+        if 'None', the default cosmology defined in cosmo_utils.py is used.
+
+    Returns
+    =======
+    k : numpy.array
+        tabulated values of k
+
+    pk : numpy.array
+        power spectrum at the specified k
+    """
+
+    # check to see if cosmology was passed
+    if cosmo is None:
+        cosmo = default_cosmo
+
+    # The redshift argument for CAMB power spectrum must be a vector
+    z = np.atleast_1d(z)
+    # but this function is written for a single value of redshift
+    if len(z)>1:
+        msg = ('`z` parameter must be a float')
+        raise ValueError(msg)
+
+    # set up CAMB
+    pars = camb.CAMBparams()
+    cosmo_param_dict = astropy_to_camb_cosmo(cosmo)
+    pars.set_cosmology(**cosmo_param_dict)
+    pars.InitPower.set_params(ns=0.965, r=0)
+    pars.set_for_lmax(lmax, lens_potential_accuracy=0)
+    pars.NonLinear = camb.model.NonLinear_both
+
+    # calculate results for these parameters
+    results = camb.get_results(pars)
+
+    # note that non-linear corrections couple to small scales
+    pars.set_matter_power(redshifts=z, kmax=maxkh*2)
+
+    # retreive the linear spectrum
+    #pars.NonLinear = camb.model.NonLinear_none
     results = camb.get_results(pars)
     kh, z, pk = results.get_matter_power_spectrum(minkh=minkh,
                                                   maxkh=maxkh,
