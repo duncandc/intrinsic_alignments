@@ -18,7 +18,6 @@ The code necessary to build linear and non-linear alignment models are located i
 These utility functions are used by various components.
 * utils.py
 * cosmo\_utils.py
-* jackknife\_observables.py
 
 ## Tests
 Some basic tests are preformed by code located in the tests directory.  These can be run using the py.test package.
