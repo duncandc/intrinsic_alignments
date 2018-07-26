@@ -107,6 +107,7 @@ def linear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-4, maxkh=100, npoin
 
     # set up CAMB
     pars = camb.CAMBparams()
+    # sets up CosmoMC-like settings, with one massive neutrino and helium set using BBN consistency
     cosmo_param_dict = astropy_to_camb_cosmo(cosmo)
     pars.set_cosmology(**cosmo_param_dict)
     pars.InitPower.set_params(ns=0.965, r=0)
