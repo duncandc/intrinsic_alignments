@@ -9,7 +9,8 @@ from astropy import constants as const
 from hmf import growth_factor
 import camb
 
-__all__=('mean_density', 'linear_growth_factor', 'linear_power_spectrum', 'nonlinear_power_spectrum' 'astropy_to_camb_cosmo')
+__all__=('mean_density', 'linear_growth_factor', 'linear_power_spectrum',
+         'nonlinear_power_spectrum' 'astropy_to_camb_cosmo')
 __author__=('Duncan Campbell')
 
 # define a default cosology for utilities
@@ -72,7 +73,7 @@ def linear_growth_factor(z, cosmo=None):
     return gf_f(z)
 
 
-def linear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-5, maxkh=100, npoints=1000):
+def linear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-4, maxkh=100, npoints=1000):
     """
     Return a tabulated linear power spectrum, :math:`P(k)`.
 
@@ -127,7 +128,7 @@ def linear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-5, maxkh=100, npoin
     return kh, pk[0]
 
 
-def nonlinear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-5, maxkh=100, npoints=1000):
+def nonlinear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-4, maxkh=100, npoints=1000):
     """
     Return a tabulated non-linear power spectrum, :math:`P(k)`.
 
@@ -173,9 +174,10 @@ def nonlinear_power_spectrum(z, cosmo=None, lmax=5000, minkh=1e-5, maxkh=100, np
     # note that non-linear corrections couple to small scales
     pars.set_matter_power(redshifts=z, kmax=maxkh*2)
 
-    # retreive the linear spectrum
-    #pars.NonLinear = camb.model.NonLinear_none
+    # retreive the non-linear spectrum
+    pars.NonLinear = camb.model.NonLinear_both
     results = camb.get_results(pars)
+    results.calc_power_spectra(pars)
     kh, z, pk = results.get_matter_power_spectrum(minkh=minkh,
                                                   maxkh=maxkh,
                                                   npoints=npoints)
