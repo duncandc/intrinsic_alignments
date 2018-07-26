@@ -203,6 +203,46 @@ class LinearAlignmentModel(object):
 
         return result
 
+    def ii_cross_projected(self, rp, pi_max=100.0, cosmo=None):
+        r"""
+        Return the projected intrinsic–intrinsic (II) ellitpicity correlation function,
+        :math:`w_{xx}`.
+
+        Paramaters
+        ==========
+        r : array_like
+            array of projected radial distances
+
+        z : array_like
+            redshift
+
+        pi_max : float
+
+        cosmo : astropy.cosmology object
+            if 'None', the default cosmology defined in cosmo_utils.py is used.
+
+        Returns
+        =======
+        """
+
+        # get interpolated integrand
+        r = np.logspace(np.log10(np.min(rp)), np.log10(np.sqrt(pi_max**2 + np.max(rp)**2)), 100)
+        xi = self.ii_cross(r)
+        # interpolate between r and xi
+        f_xi = interp1d(r, xi, fill_value='extrapolate')
+
+        def integrand(x, y):
+            r = np.sqrt(x*x + y*y)
+            return (f_xi(r))
+
+        # integrate for each value of rp between pi=[0,pi_max].
+        N = len(rp)
+        result = np.zeros(N)
+        for i in range(0, N):
+            result[i] = 2.0*integrate.quad(integrand, 0.0, pi_max, args=(rp[i],))[0]
+
+        return result
+
 
 class NonLinearAlignmentModel(LinearAlignmentModel):
     r"""
