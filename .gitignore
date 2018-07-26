@@ -1,3 +1,10 @@
+#large files
+############
+*.hdf5
+*.csv
+*.fits
+*.pdf
+
 # Latex #
 #########
 *.log
@@ -5,7 +12,6 @@
 *.blg
 *.bbl
 *.synctex.gz
-*.pdf
 
 # Compiled source #
 ###################
