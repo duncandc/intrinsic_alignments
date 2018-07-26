@@ -1,10 +1,14 @@
 """
-class for HRH model
+classes for HRH models
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import numpy as np
 import scipy.integrate as integrate
+
+
+__author__=('Duncan Campbell')
+__all__=('HRHstar', 'HRH')
 
 
 class HRHstar(object):
