@@ -5,6 +5,7 @@
 *.blg
 *.bbl
 *.synctex.gz
+*.pdf
 
 # Compiled source #
 ###################
