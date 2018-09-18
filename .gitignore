@@ -1,3 +1,10 @@
+#large files
+############
+*.hdf5
+*.csv
+*.fits
+*.pdf
+
 # Latex #
 #########
 *.log
