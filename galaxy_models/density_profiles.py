@@ -12,10 +12,32 @@ from scipy.special import btdtri as beta_inv
 
 class cusped_density(object):
     """
+    A cusped desnity distribution with inner slope :math:`\gamma` 
+    and outer slope :math:`n`  
     """
 
     def __init__(self, gamma=1, n=4, b_to_a=1.0, c_to_a=1.0, mtot=1.0):
         """
+        Parameters
+        ----------
+        gamma : float
+            inner slope
+
+        n : float
+            outer slop
+
+        b_to_a : float
+            intermediate to major axis ratio
+
+        c_to_a : float
+            minor to major axis ratio
+
+        mtot : float
+            total mass
+
+        Notes
+        -----
+        gamma = 1 and n = 4, corresponds to the Hernquist profile.
         """
 
         self.gamma = gamma
@@ -28,6 +50,12 @@ class cusped_density(object):
 
     def enclosed_mass(self, m):
         """
+        Return the enclosed mass within the dimensionless ellipsoidal radius, :math:`m`.
+
+        Parameters
+        ----------
+        m : array_like
+             array of dimensionless ellipsoidal radius
         """
 
         a = self.a
@@ -44,6 +72,7 @@ class cusped_density(object):
 
     def central_density(self):
         """
+        Return central desnity, :math:`\rho_0`.
         """
         
         a = self.a
@@ -59,10 +88,18 @@ class cusped_density(object):
 
     def sample(self, size):
         """
-        returned axis algined particles drawn from density profile.
-        - major axis is aligned with the x-axis
-        - intermediate with the y-axis
-        - minor axis with the z-axis
+        Returned Monte Carlo samples from the 3D triaxial density distribution.
+        
+        Parameters
+        ----------
+        size: int
+            number of samples to return
+
+        Notes
+        -----
+        The distirbution is assumed to be axis-aligned with the
+        major axis aligned with the x-axis, the intermediate with 
+        the y-axisv and the minor axis with the z-axis.
         """
 
         gamma = self.gamma
