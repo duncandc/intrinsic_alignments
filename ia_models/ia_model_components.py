@@ -48,7 +48,7 @@ class RandomAlignment(object):
 
         # assign random orientations
         major_v = normalized_vectors(np.random.random((N,3))*2.0 - 1.0)
-        inter_v = normalized_vectors(random_perpendicular_directions(major_v))
+        inter_v = random_perpendicular_directions(major_v)
         minor_v = normalized_vectors(np.cross(major_v, inter_v))
 
         try:
