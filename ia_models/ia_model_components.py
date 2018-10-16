@@ -5,10 +5,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
-from intrinsic_alignments.ia_models.utils import random_perpendicular_directions
 from halotools.utils import normalized_vectors, vectors_between_list_of_vectors, vectors_normal_to_planes,\
     angles_between_list_of_vectors, rotation_matrices_from_angles, rotate_vector_collection
 from scipy.optimize import minimize
+from rotations.mcrotations import random_perpendicular_directions
 
 from warnings import warn
 
@@ -18,7 +18,65 @@ from intrinsic_alignments.ia_models.watson_distribution import DimrothWatson
 __all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment',
            'HybridSatelliteAlignment',
            'HaloMassCentralAlignmentStrength', 'RadialSatelliteAlignmentStrength')
-__author__ = ('Duncan Campbell', 'Andrew Hearin')
+__author__ = ('Duncan Campbell',)
+
+
+class RandomAlignment(object):
+    """
+    """
+    def __init__(self, **kwargs):
+        """
+        """
+
+        self._mock_generation_calling_sequence = (['assign_orientation'])
+
+        self._galprop_dtypes_to_allocate = np.dtype(
+            [(str('galaxy_axisA_x'), 'f4'), (str('galaxy_axisA_y'), 'f4'), (str('galaxy_axisA_z'), 'f4'),
+             (str('galaxy_axisB_x'), 'f4'), (str('galaxy_axisB_y'), 'f4'), (str('galaxy_axisB_z'), 'f4'),
+             (str('galaxy_axisC_x'), 'f4'), (str('galaxy_axisC_y'), 'f4'), (str('galaxy_axisC_z'), 'f4')])
+
+        self.list_of_haloprops_needed = []
+        self._methods_to_inherit = ([])
+        self.param_dict = ({})
+
+    def assign_orientation(self, **kwargs):
+        r"""
+        """
+
+        table = kwargs['table']
+        N = len(table)
+
+        # assign random orientations
+        major_v = normalized_vectors(np.random.random((N,3))*2.0 - 1.0)
+        inter_v = normalized_vectors(random_perpendicular_directions(major_v))
+        minor_v = normalized_vectors(np.cross(major_v, inter_v))
+
+        try:
+            mask = (table['gal_type'] == self.gal_type)
+        except KeyError:
+            mask = np.array([True]*len(table))
+            msg = ("Because `gal_type` not indicated in `table`.",
+                   "The orientation is being assigned for all galaxies in the `table`.")
+            print(msg)
+
+        # check to see if the columns exist
+        for key in list(self._galprop_dtypes_to_allocate.names):
+            if key not in table.keys():
+                table[key] = 0.0
+
+        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
+        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
+
+        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
+
+        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+
+        return table
 
 
 class CentralAlignment(object):
