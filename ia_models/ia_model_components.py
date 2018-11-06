@@ -44,40 +44,47 @@ class RandomAlignment(object):
         r"""
         """
 
-        table = kwargs['table']
-        N = len(table)
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            N = len(table)
+        else:
+            N = kwargs['size']
 
         # assign random orientations
         major_v = random_unit_vectors_3d(N)
         inter_v = random_perpendicular_directions(major_v)
         minor_v = normalized_vectors(np.cross(major_v, inter_v))
 
-        try:
-            mask = (table['gal_type'] == self.gal_type)
-        except KeyError:
-            mask = np.array([True]*len(table))
-            msg = ("Because `gal_type` not indicated in `table`.",
+        if 'table' in kwargs.keys():
+
+            try:
+                mask = (table['gal_type'] == self.gal_type)
+            except KeyError:
+                mask = np.array([True]*N)
+                msg = ("Because `gal_type` not indicated in `table`.",
                    "The orientation is being assigned for all galaxies in the `table`.")
-            print(msg)
+                print(msg)
 
-        # check to see if the columns exist
-        for key in list(self._galprop_dtypes_to_allocate.names):
-            if key not in table.keys():
-                table[key] = 0.0
+            # check to see if the columns exist
+            for key in list(self._galprop_dtypes_to_allocate.names):
+                if key not in table.keys():
+                    table[key] = 0.0
 
-        table['galaxy_axisA_x'][mask] = major_v[mask, 0]
-        table['galaxy_axisA_y'][mask] = major_v[mask, 1]
-        table['galaxy_axisA_z'][mask] = major_v[mask, 2]
+            table['galaxy_axisA_x'][mask] = c[mask, 0]
+            table['galaxy_axisA_y'][mask] = major_v[mask, 1]
+            table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
-        table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
-        table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
-        table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
+            table['galaxy_axisB_x'][mask] = inter_v[mask, 0]
+            table['galaxy_axisB_y'][mask] = inter_v[mask, 1]
+            table['galaxy_axisB_z'][mask] = inter_v[mask, 2]
 
-        table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
-        table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
-        table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
+            table['galaxy_axisC_x'][mask] = minor_v[mask, 0]
+            table['galaxy_axisC_y'][mask] = minor_v[mask, 1]
+            table['galaxy_axisC_z'][mask] = minor_v[mask, 2]
 
-        return table
+            return table
+        else:
+            return major_v, inter_v, minor_v
 
 
 class CentralAlignment(object):
