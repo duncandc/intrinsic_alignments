@@ -220,13 +220,12 @@ class CentralAlignment(object):
                        "The orientation is being assigned for all galaxies in the `table`.")
                 print(msg)
 
-            # add orientations to the galaxy table
-
             # check to see if the columns exist
             for key in list(self._galprop_dtypes_to_allocate.names):
                 if key not in table.keys():
                     table[key] = 0.0
 
+            # add orientations to the galaxy table
             table['galaxy_axisA_x'][mask] = major_v[mask, 0]
             table['galaxy_axisA_y'][mask] = major_v[mask, 1]
             table['galaxy_axisA_z'][mask] = major_v[mask, 2]
