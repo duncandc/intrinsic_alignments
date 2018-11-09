@@ -70,7 +70,7 @@ class RandomAlignment(object):
                 if key not in table.keys():
                     table[key] = 0.0
 
-            table['galaxy_axisA_x'][mask] = c[mask, 0]
+            table['galaxy_axisA_x'][mask] = major_v[mask, 0]
             table['galaxy_axisA_y'][mask] = major_v[mask, 1]
             table['galaxy_axisA_z'][mask] = major_v[mask, 2]
 
