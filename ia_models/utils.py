@@ -8,8 +8,7 @@ from astropy.utils.misc import NumpyRNGContext
 from astropy.table import Table
 from halotools.utils import crossmatch, elementwise_norm, elementwise_dot, normalized_vectors
 
-__all__ = ('halocat_to_galaxy_table', 'random_perpendicular_directions',
-           'project_onto_plane', 'symmetrize_angular_distribution', 'pbc_radial_vector')
+__all__ = ('halocat_to_galaxy_table', 'symmetrize_angular_distribution', 'pbc_radial_vector')
 
 
 __author__ = ('Duncan Campbell', 'Andrew Hearin')
@@ -73,54 +72,6 @@ def halocat_to_galaxy_table(halocat):
     table['halo_axisA_z'][inds1] = halocat.halo_table['halo_axisA_z'][inds2]
 
     return table
-
-
-def random_perpendicular_directions(v, seed=None):
-    r"""
-    Given an input list of 3d vectors, v, return a list of 3d vectors
-    such that each returned vector has unit-length and is
-    orthogonal to the corresponding vector in v.
-
-    Parameters
-    ----------
-    v : ndarray
-        Numpy array of shape (npts, 3) storing a collection of 3d vectors
-
-    seed : int, optional
-        Random number seed used to choose a random orthogonal direction
-
-    Returns
-    -------
-    result : ndarray
-        Numpy array of shape (npts, 3)
-
-    """
-    v = np.atleast_2d(v)
-    npts = v.shape[0]
-    with NumpyRNGContext(seed):
-        w = np.random.random((npts, 3))
-
-    vnorms = elementwise_norm(v).reshape((npts, 1))
-    wnorms = elementwise_norm(w).reshape((npts, 1))
-
-    e_v = v/vnorms
-    e_w = w/wnorms
-
-    v_dot_w = elementwise_dot(e_v, e_w).reshape((npts, 1))
-
-    e_v_perp = e_w - v_dot_w*e_v
-    e_v_perp_norm = elementwise_norm(e_v_perp).reshape((npts, 1))
-    return e_v_perp/e_v_perp_norm
-
-
-def project_onto_plane(x, n):
-    """
-    given a collection of 3D vectors x and n,
-    project x onto the plane normal to vector n
-    """
-    n = normalized_vectors(n)
-    d = elementwise_dot(x,n)
-    return x - d[:,np.newaxis]*n
 
 
 def symmetrize_angular_distribution(theta, radians=True):
