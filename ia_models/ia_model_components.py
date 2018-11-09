@@ -16,9 +16,13 @@ from warnings import warn
 from intrinsic_alignments.ia_models.watson_distribution import DimrothWatson
 
 
-__all__ = ('CentralAlignment', 'RadialSatelliteAlignment', 'MajorAxisSatelliteAlignment',
+__all__ = ('RandomAlignment',
+           'CentralAlignment',
+           'RadialSatelliteAlignment',
+           'MajorAxisSatelliteAlignment',
            'HybridSatelliteAlignment',
-           'HaloMassCentralAlignmentStrength', 'RadialSatelliteAlignmentStrength')
+           'HaloMassCentralAlignmentStrength',
+           'RadialSatelliteAlignmentStrength')
 __author__ = ('Duncan Campbell',)
 
 
