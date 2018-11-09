@@ -5,15 +5,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 from astropy.utils.misc import NumpyRNGContext
-from halotools.utils import (normalized_vectors, vectors_between_list_of_vectors,
-    vectors_normal_to_planes, rotation_matrices_from_angles, rotate_vector_collection)
 from scipy.optimize import minimize
+from rotations import rotate_vector_collection
 from rotations.mcrotations import random_perpendicular_directions, random_unit_vectors_3d
-from rotations.vector_utilities import angles_between_list_of_vectors
-
+from rotations.vector_utilities import (elementwise_dot, elementwise_norm, normalized_vectors,
+                                        angles_between_list_of_vectors)
+from rotations.rotations3d import (vectors_between_list_of_vectors, vectors_normal_to_planes,
+                                   rotation_matrices_from_angles)
+from watson_distribution import DimrothWatson
 from warnings import warn
-
-from intrinsic_alignments.ia_models.watson_distribution import DimrothWatson
 
 
 __all__ = ('RandomAlignment',
@@ -28,6 +28,7 @@ __author__ = ('Duncan Campbell',)
 
 class RandomAlignment(object):
     """
+    class to model random galaxy orientations
     """
     def __init__(self, **kwargs):
         """
