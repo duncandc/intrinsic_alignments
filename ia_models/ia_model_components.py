@@ -30,9 +30,11 @@ class RandomAlignment(object):
     """
     class to model random galaxy orientations
     """
-    def __init__(self, **kwargs):
+    def __init__(self, gal_type='centrals', **kwargs):
         """
         """
+
+        self.gal_type = gal_type
 
         self._mock_generation_calling_sequence = (['assign_orientation'])
 
