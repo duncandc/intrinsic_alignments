@@ -1,6 +1,4 @@
-# Intrinsic Alignments
-
-A project to measure and model the intrinsic alignments of galaxy shapes in observations and simulations.
+# Notes
 
 Possible avenues of research:
 
@@ -17,13 +15,16 @@ Tools that will be needed:
 * shape-shape TPCF 
 * develop model for galaxy type and alignment strength
 
+
 Simulations:
 
 * MassiveBlack II
+* Illustris OG
+* Illustris TNG
 * Adiabatic Sim
 
 Observations:
 
 * SDSS main sample
-* BOSS LRG
-* eBOSS ?
+* BOSS LRG sample
+* eBOSS
