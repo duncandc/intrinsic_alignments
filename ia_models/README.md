@@ -14,7 +14,7 @@ The alignment models in `ia_model_componenets.py` use an implemntation of the Wa
 A demonstration of the IA model components is in the `IA_Modelling_Demo.ipynb` notebook.
 
 
-## Auxiallary Models
+## Auxiliary Models
 
 In additon to models for galaxy-halo alignments, this direcory contains models for the number and position of galaxies to assist in examing various alignment effects.  These include:
 
