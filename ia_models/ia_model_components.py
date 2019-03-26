@@ -1008,7 +1008,7 @@ class HybridSatelliteAlignment(object):
         return a
 
 
-def alignment_strenth(p):
+def alignment_strength(p):
     r"""
     convert alignment strength argument to shape parameter for costheta distribution
     """
@@ -1024,7 +1024,7 @@ def alignment_strenth(p):
     return -1.0*k
 
 
-def inverse_alignment_strenth(k):
+def inverse_alignment_strength(k):
     r"""
     convert shape parameter for costheta distribution to alignment strength
     """
@@ -1080,7 +1080,7 @@ def axes_correlated_with_z(p, seed=None):
             uran = np.random.uniform(0, 1, npts)
             cos_t = uran*2.0 - 1.0
         else:
-            k = alignment_strenth(p)
+            k = alignment_strength(p)
             d = DimrothWatson()
             cos_t = d.rvs(k)
 
