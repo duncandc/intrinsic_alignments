@@ -32,14 +32,12 @@ def symmetrize_angular_distribution(theta, radians=True):
     if not radians:
         theta = np.radians(theta)
 
-    dtheta = np.fabs(np.pi - np.fabs(theta))
-
     uran = np.random.random(len(theta))
     result = np.pi + dtheta
     result[uran < 0.5] = -1.0*result[uran < 0.5]
 
     if not radians:
-        theta = np.degrees(theta)
+        result = np.degrees(theta)
 
     return result
 

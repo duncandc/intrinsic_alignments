@@ -73,9 +73,6 @@ class Bett12SatelliteAlignment(object):
     def set_default_params(self):
         """
         Notes
-        -----
-        Parameter values are averages taken from table 3 in Knebe + (2008).
-        These are also the values used in Joachimi + (2013).
         """
         self.param_dict = {self.gal_type + '_alingment_scatter': 0.55}
 
