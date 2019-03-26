@@ -1,7 +1,5 @@
 # Intrinsic Alignments
 
-Model and constrain the intrinsic alignment of galaxies.
-
 ## Description
 
 This is a project to measure and model the intrinsic alignments of galaxies in both observations and simulations.
