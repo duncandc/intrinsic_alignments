@@ -60,6 +60,8 @@ class Bett12SatelliteAlignment(object):
 
         self._methods_to_inherit = (['assign_satellite_orientation', 'inherit_halocat_properties'])
 
+        self.set_default_params()
+
 
     def inherit_halocat_properties(self, seed=None, **kwargs):
         """
@@ -79,6 +81,8 @@ class Bett12SatelliteAlignment(object):
 
     def misalignment_pdf(self, costheta):
         """
+        See Bett (2012) eq. 9
+
         Parameters
         ----------
         costheta : array_like
@@ -90,7 +94,10 @@ class Bett12SatelliteAlignment(object):
         cos_0 = np.cos(0.0)
         kappa = 1.0/(sigma**2)
         I0 = modified_bessel(0.0, kappa*np.sin(theta)*np.sin(0.0))
-        return (kappa)/(2.0*np.sinh(kappa))*np.exp(kappa*costheta*cos_0)*I0
+        result_1 = (kappa)/(2.0*np.sinh(kappa))*np.exp(kappa*costheta*cos_0)*I0
+        result_2 = (kappa)/(2.0*np.sinh(kappa))*np.exp(-1.0*kappa*costheta*cos_0)*I0
+        return (result_1 + result_2)/2.0
+
 
     def misalignment_rvs(self, size):
         """
@@ -107,7 +114,12 @@ class Bett12SatelliteAlignment(object):
         cos_theta = sigma**2*np.log(np.exp(-1.0*sigma**(-2.0))+2.0*np.sinh(sigma**(-2.0))*ran_u)
         
         flip = (np.random.random(size=size)>0.5)
+        cos_theta[flip] = -1.0*cos_theta[flip]
         theta = np.arccos(cos_theta)
+
+        mask = (theta>np.pi/2.0)
+        theta[mask] = theta[mask]-np.pi
+
         return theta
 
     def assign_satellite_orientation(self, **kwargs):
@@ -355,17 +367,12 @@ class Knebe08SatelliteAlignment(object):
         Parameters
         ----------
         theta : array_like
-             misalingment angle in radians
-
-        Notes
-        -----
-        See eq. 5 in knebe + (2008)
-        There is a typo in this equation popinted out in Joachimi + (2013) eq. 7. 
+             misalingment angle in radians 
         """
         A = self.param_dict[self.gal_type + '_alingment_A']
         B = self.param_dict[self.gal_type + '_alingment_B']
         x = costheta
-        return 0.2*(A*x**5+A+5*B*x +5*B)/(0.2*A+B)
+        return 0.5*0.2*(A*x**5+A+5*B*x +5*B)/(0.2*A+B)
 
     def misalignment_rvs(self, size):
         """
@@ -380,7 +387,12 @@ class Knebe08SatelliteAlignment(object):
         f_yx = interp1d(y,x, kind='linear')
         ran_u = np.random.random(size=size)
 
-        return np.arccos(f_yx(ran_u))
+        theta = np.arccos(f_yx(ran_u))
+
+        mask = (theta>np.pi/2.0)
+        theta[mask] = theta[mask]-np.pi
+
+        return theta
 
     def assign_satellite_orientation(self, **kwargs):
         r"""
@@ -581,6 +593,8 @@ class Bett12CentralAlignment():
 
     def misalignment_pdf(self, costheta):
         """
+        See Bett (2012) eq. 9
+
         Parameters
         ----------
         costheta : array_like
@@ -592,7 +606,10 @@ class Bett12CentralAlignment():
         cos_0 = np.cos(0.0)
         kappa = 1.0/(sigma**2)
         I0 = modified_bessel(0.0, kappa*np.sin(theta)*np.sin(0.0))
-        return (kappa)/(2.0*np.sinh(kappa))*np.exp(kappa*costheta*cos_0)*I0
+        result_1 = (kappa)/(2.0*np.sinh(kappa))*np.exp(kappa*costheta*cos_0)*I0
+        result_2 = (kappa)/(2.0*np.sinh(kappa))*np.exp(-1.0*kappa*costheta*cos_0)*I0
+        return (result_1 + result_2)/2.0
+
 
     def misalignment_rvs(self, size):
         """
@@ -609,7 +626,12 @@ class Bett12CentralAlignment():
         cos_theta = sigma**2*np.log(np.exp(-1.0*sigma**(-2.0))+2.0*np.sinh(sigma**(-2.0))*ran_u)
         
         flip = (np.random.random(size=size)>0.5)
+        cos_theta[flip] = -1.0*cos_theta[flip]
         theta = np.arccos(cos_theta)
+
+        mask = (theta>np.pi/2.0)
+        theta[mask] = theta[mask]-np.pi
+
         return theta
         
     def assign_central_orientation(self, **kwargs):
@@ -739,11 +761,15 @@ class Okumura09CentralAlignment():
         theta : array_like
              misalingment angle in radians
         """
+
+        theta = np.fabs(theta)
+
         sigma = self.param_dict[self.gal_type + '_alingment_scatter']
         myclip_a = -np.pi/2.0
+        myclip_a = 0
         myclip_b = np.pi/2.0
         a, b = (myclip_a - 0.0)/sigma, (myclip_b - 0.0)/sigma
-        return truncnorm.pdf(theta, a=a, b=b, scale=sigma)
+        return truncnorm.pdf(theta, a=a, b=b, scale=sigma)/2.0
 
     def misalignment_rvs(self, size):
         """
@@ -752,10 +778,13 @@ class Okumura09CentralAlignment():
         size : int
         """
         sigma = self.param_dict[self.gal_type + '_alingment_scatter']
-        myclip_a = -np.pi/2.0
+        myclip_a = 0.0
         myclip_b = np.pi/2.0
         a, b = (myclip_a - 0.0)/sigma, (myclip_b - 0.0)/sigma
-        return truncnorm.rvs(size=size, a=a, b=b, scale=sigma)
+        theta =  truncnorm.rvs(size=size, a=a, b=b, scale=sigma)
+        uran = np.random.random(size)
+        theta[uran < 0.5] = -1.0*theta[uran < 0.5]
+        return theta
 
     def assign_central_orientation(self, **kwargs):
         r"""
