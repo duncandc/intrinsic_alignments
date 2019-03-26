@@ -16,10 +16,12 @@ See `literature_models_demo.ipynb` for an demonstration of the misalignment angl
 
 ## Correlation Function Models
 
-* HRH model
-* HRH* model
+We provide some fitting functions for galaxy-alignment correlation functions:
 
-These models can be found in `hrh_model.py`.
+* [HRH* model](https://arxiv.org/abs/astro-ph/0310174)
+* [HRH model](https://arxiv.org/abs/astro-ph/0005269)
+
+These models can be found in `hrh_model.py`. See [Mandelbaum et al. (2006)](https://arxiv.org/abs/astro-ph/0509026) for the default parameters used in the HRH* class and [Heymans et al. (2004)](https://arxiv.org/abs/astro-ph/0310174) for the default parameters used in the HRH class.
 
 
 ## (N)LA Models

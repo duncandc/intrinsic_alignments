@@ -13,7 +13,7 @@ __all__=('HRHstar', 'HRH')
 
 class HRHstar(object):
     """
-    Heavens, Refregier, and Heymans model class
+    modified Heavens, Refregier, and Heymans (HRH*) model class
     for modelling intrinsic galaxy alignment correlation functions
     """
 
@@ -155,7 +155,7 @@ class HRHstar(object):
 
 class HRH(object):
     """
-    Heavens, Refregier, and Heymans model class
+    Heavens, Refregier, and Heymans (HRH) model class
     for modelling intrinsic galaxy alignment correlation functions
     """
 
@@ -183,8 +183,8 @@ class HRH(object):
 
     def set_params(self, **kwargs):
         """
-        Set the parameters for model.
-        The values are taken from table 4 in Mandelbaum et al. 2006.
+        Set the parameters for model. 
+        The values are taken from eq. 9 in Heymans + 2004.
         """
 
         self.params = {'A': 0.012,
