@@ -7,9 +7,10 @@ from halotools.utils import crossmatch, normalized_vectors, angles_between_list_
 from halotools.mock_observables import relative_positions_and_velocities
 
 
-__all__=['load_halocat']
+__all__=['load_value_added_halocat', 'halocat_to_galaxy_table']
 
-def load_halocat(simname='bolplanck', redshift=0.0, version_name='halotools_v0p4'):
+
+def load_value_added_halocat(simname='bolplanck', redshift=0.0, version_name='halotools_v0p4'):
     """
     adds properties to halotools rockstar halo catalogs
 
@@ -81,5 +82,81 @@ def load_halocat(simname='bolplanck', redshift=0.0, version_name='halotools_v0p4
 
     return halocat
 
+
+def halocat_to_galaxy_table(halocat):
+    """
+    transform a Halotools halocat.halo_table into a 
+    test galaxy_table object, used for testing model componenets
+    
+    Returns
+    -------
+    galaxy_table : astropy.table object
+    """
+
+    halo_id = halocat.halo_table['halo_id']
+    halo_upid = halocat.halo_table['halo_upid']
+    host_id = halocat.halo_table['halo_hostid']
+
+    # create galaxy table
+    table = Table([halo_id, halo_upid, host_id], names=('halo_id', 'halo_upid', 'halo_hostid'))
+    
+    # add position information
+    table['x'] = halocat.halo_table['halo_x']
+    table['y'] = halocat.halo_table['halo_y']
+    table['z'] = halocat.halo_table['halo_z']
+    table['vx'] = halocat.halo_table['halo_vx']
+    table['vy'] = halocat.halo_table['halo_vy']
+    table['vz'] = halocat.halo_table['halo_vz']
+    
+    # add halo mass
+    table['halo_mpeak'] = halocat.halo_table['halo_mpeak']
+
+    # add orientation information
+    # place holders for now
+    table['galaxy_axisA_x'] = 0.0
+    table['galaxy_axisA_y'] = 0.0
+    table['galaxy_axisA_z'] = 0.0
+
+    table['galaxy_axisB_x'] = 0.0
+    table['galaxy_axisB_y'] = 0.0
+    table['galaxy_axisB_z'] = 0.0
+
+    table['galaxy_axisC_x'] = 0.0
+    table['galaxy_axisC_y'] = 0.0
+    table['galaxy_axisC_z'] = 0.0
+
+    # tag centrals vs satellites
+    hosts = (halocat.halo_table['halo_upid'] == -1)
+    subs = (halocat.halo_table['halo_upid'] != -1)
+    table['gal_type'] = 'satellites'
+    table['gal_type'][hosts] = 'centrals'
+    table['gal_type'][subs] = 'satellites'
+
+    # host halo properties
+    inds1, inds2 = crossmatch(halocat.halo_table['halo_hostid'], halocat.halo_table['halo_id'])
+    
+    # host halo position
+    table['halo_x'] = 0.0
+    table['halo_x'][inds1] = halocat.halo_table['halo_x'][inds2]
+    table['halo_y'] = 0.0
+    table['halo_y'][inds1] = halocat.halo_table['halo_y'][inds2]
+    table['halo_z'] = 0.0
+    table['halo_z'][inds1] = halocat.halo_table['halo_z'][inds2]
+    
+    # host haloo mass
+    table['halo_mvir'] = 0.0
+    table['halo_mvir'][inds1] = halocat.halo_table['halo_mvir'][inds2]
+    table['halo_rvir'] = 0.0
+    table['halo_rvir'][inds1] = halocat.halo_table['halo_rvir'][inds2]
+
+    # assign orientations
+    table['halo_axisA_x'] = 0.0
+    table['halo_axisA_x'][inds1] = halocat.halo_table['halo_axisA_x'][inds2]
+    table['halo_axisA_y'] = 0.0
+    table['halo_axisA_y'][inds1] = halocat.halo_table['halo_axisA_y'][inds2]
+    table['halo_axisA_z'] = 0.0
+    table['halo_axisA_z'][inds1] = halocat.halo_table['halo_axisA_z'][inds2]
+
+    return table
 
 
