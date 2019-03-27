@@ -158,38 +158,6 @@ def binned_bootstrap_1d(x, values, bins, statistic='mean', Nboot=100):
     return mean_result, err
 
 
-def symmetrize_angular_distribution(theta, radians=True):
-    """
-    Return theta such that sign[cos(theta)] is equally likley to be 1 and -1.
-
-    parameters
-    ----------
-    theta : arra_like
-        an array of angles between [0.0,np.pi]
-
-    radians :  bool
-        boolean indicating if `theta` is in radians.
-        If False, it is assummed `theta` is in degrees.
-
-    Returns
-    -------
-    theta : numpy.array
-    """
-
-    if not radians:
-        theta = np.radians(theta)
-
-    dtheta = np.fabs(np.pi - np.fabs(theta))
-
-    uran = np.random.random(len(costheta_1))
-    result = np.pi + dtheta
-    result[uran < 0.5] = -1.0*result[uran < 0.5]
-
-    if not radians:
-        theta = np.degrees(theta)
-
-    return result
-
 
 
 
