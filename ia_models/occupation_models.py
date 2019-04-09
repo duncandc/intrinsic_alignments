@@ -9,6 +9,9 @@ from warnings import warn
 from halotools.utils import crossmatch
 from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
 
+from halotools.empirical_models import NFWPhaseSpace
+from rotations.rotations3d import rotation_matrices_from_basis
+
 
 __all__ = ()
 __author__ = ('Duncan Campbell')
@@ -417,6 +420,253 @@ class SemiIsotropicSubhaloPositions():
             result = np.array(['satellites']*len(upid))
             result[centrals] = 'centrals'
             return result
+
+
+class TriaxialNFW():
+    """
+    galaxy occupation model that places centrals and satellites in haloes and isotropized sub-haloes
+    """
+
+    def __init__(self, anisotropy_bias=1.0, **kwargs):
+
+        self._mock_generation_calling_sequence = ['assign_gal_type', 'assign_positions']
+        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'string'),
+                                                     (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4')])
+        self.list_of_haloprops_needed = ['halo_upid', 'halo_x', 'halo_y', 'halo_z', 'halo_hostid',
+                                         'halo_axisA_x','halo_axisA_y','halo_axisA_z',
+                                         'halo_axisC_x','halo_axisC_y','halo_axisC_z',
+                                         'halo_b_to_a', 'halo_c_to_a', 'halo_nfw_conc', 'halo_rvir']
+
+        # set default box size.
+        if 'Lbox' in kwargs.keys():
+            self._Lbox = kwargs['Lbox']
+        else:
+            self._Lbox = np.array([np.inf,np.inf,np.inf])
+        # update Lbox if a halo catalog object is passed.
+        self._additional_kwargs_dict = dict(inherit_halocat_properties=['Lbox'])
+
+        self.param_dict = ({
+            'anisotropy_bias': anisotropy_bias})
+
+    def inherit_halocat_properties(self, seed=None, **kwargs):
+        """
+        inherit the box size during mock population
+        """
+        Lbox = kwargs['Lbox']
+        self._Lbox = Lbox
+
+    def assign_positions(self, **kwargs):
+        """
+        assign satellite positions based on subhalo radial positions and random angular positions.
+        """
+
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            halo_x = table['halo_x']
+            halo_y = table['halo_y']
+            halo_z = table['halo_z']
+            halo_hostid = table['halo_hostid']
+            halo_id = table['halo_id']
+            b_to_a = table['halo_b_to_a']
+            c_to_a = table['halo_c_to_a']
+            halo_axisA_x = table['halo_axisA_x']
+            halo_axisA_y = table['halo_axisA_y']
+            halo_axisA_z = table['halo_axisA_z']
+            halo_axisC_x = table['halo_axisC_x']
+            halo_axisC_y = table['halo_axisC_y']
+            halo_axisC_z = table['halo_axisC_z']
+            concentration = table['halo_nfw_conc']
+            rvir = table['halo_rvir']
+            try:
+                Lbox = kwargs['Lbox']
+            except KeyError:
+                Lbox = self._Lbox
+        else:
+            halo_x = kwargs['halo_x']
+            halo_y = kwargs['halo_y']
+            halo_z = kwargs['halo_z']
+            halo_hostid = kwargs['halo_hostid']
+            halo_id = kwargs['halo_id']
+            b_to_a = kwargs['halo_b_to_a']
+            c_to_a = kwargs['halo_c_to_a']
+            halo_axisA_x = kwargs['halo_axisA_x']
+            halo_axisA_y = kwargs['halo_axisA_y']
+            halo_axisA_z = kwargs['halo_axisA_z']
+            halo_axisC_x = kwargs['halo_axisC_x']
+            halo_axisC_y = kwargs['halo_axisC_y']
+            halo_axisC_z = kwargs['halo_axisC_z']
+            concentration = kwargs['halo_nfw_conc']
+            rvir = tabel['halo_rvir']
+            try:
+                Lbox = kwargs['Lbox']
+            except KeyError:
+                Lbox = self._Lbox
+
+        Npts = len(halo_x)
+
+        # get host halo properties
+        inds1, inds2 = crossmatch(halo_hostid, halo_id)
+
+        host_halo_concentration = np.zeros(Npts)
+        host_halo_concentration[inds1] = concentration[inds2]
+
+        host_halo_rvir = np.zeros(Npts) 
+        host_halo_rvir[inds1] = rvir[inds2]
+
+        host_b_to_a = np.zeros(Npts)
+        host_b_to_a[inds1] = b_to_a[inds2]
+        host_c_to_a = np.zeros(Npts)
+        host_c_to_a[inds1] = c_to_a[inds2]
+
+        major_axis = np.vstack((halo_axisA_x, halo_axisA_y, halo_axisA_z)).T
+        minor_axis = np.vstack((halo_axisC_x, halo_axisC_y, halo_axisC_z)).T
+        inter_axis = np.cross(major_axis, minor_axis)
+
+        host_major_axis = np.zeros((Npts,3))
+        host_inter_axis = np.zeros((Npts,3))
+        host_minor_axis = np.zeros((Npts,3))
+        host_major_axis[inds1] = major_axis[inds2]
+        host_inter_axis[inds1] = inter_axis[inds2]
+        host_minor_axis[inds1] = minor_axis[inds2]
+
+        # host x,y,z-position
+        halo_x[inds1] = halo_x[inds2]
+        halo_y[inds1] = halo_y[inds2]
+        halo_z[inds1] = halo_z[inds2]
+
+        # host halo centric positions
+        phi = np.random.uniform(0, 2*np.pi, Npts)
+        uran = np.random.rand(Npts)*2 - 1
+
+        cos_t = uran
+        sin_t = np.sqrt((1.-cos_t*cos_t))
+
+        b_to_a, c_to_a = self.anisotropy_bias_response(host_b_to_a, host_c_to_a)
+
+        c_to_b = c_to_a/b_to_a
+
+        # temporarily use x-axis as the major axis
+        x = 1.0/c_to_a*sin_t * np.cos(phi)
+        y = 1.0/c_to_b*sin_t * np.sin(phi)
+        z = cos_t
+
+        x_correlated_axes = np.vstack((x, y, z)).T
+
+        x_axes = np.tile((1, 0, 0), Npts).reshape((Npts, 3))
+
+        matrices = rotation_matrices_from_basis(host_major_axis,host_inter_axis,host_minor_axis)
+
+        # rotate x-axis into the major axis
+        #angles = angles_between_list_of_vectors(x_axes, major_axes)
+        #rotation_axes = vectors_normal_to_planes(x_axes, major_axes)
+        #matrices = rotation_matrices_from_angles(angles, rotation_axes)
+
+        correlated_axes = rotate_vector_collection(matrices, x_correlated_axes)
+
+        x, y, z = correlated_axes[:, 0], correlated_axes[:, 1], correlated_axes[:, 2]
+
+        nfw = NFWPhaseSpace(conc_mass_model='direct_from_halo_catalog',)
+        dimensionless_radial_distance = nfw._mc_dimensionless_radial_distance(host_halo_concentration)
+
+        x *= dimensionless_radial_distance
+        y *= dimensionless_radial_distance
+        z *= dimensionless_radial_distance 
+
+        x *= host_halo_rvir
+        y *= host_halo_rvir
+        z *= host_halo_rvir
+
+        a = 1
+        b = b_to_a * a
+        c = c_to_a * a
+        T = (c**2-b**2)/(c**2-a**2)
+        q = b/a
+        s = c/a
+
+        x *= np.sqrt(q*s)
+        y *= np.sqrt(q*s)
+        z *= np.sqrt(q*s)
+
+        # move back into original cordinate system
+        xx = halo_x + x
+        yy = halo_y + y
+        zz = halo_z + z
+
+        # account for PBCs
+        mask = (xx < 0.0)
+        xx[mask] = xx[mask] + Lbox[0]
+        mask = (xx > Lbox[0])
+        xx[mask] = xx[mask] - Lbox[0]
+        mask = (yy < 0.0)
+        yy[mask] = yy[mask] + Lbox[1]
+        mask = (yy > Lbox[1])
+        yy[mask] = yy[mask] - Lbox[1]
+        mask = (zz < 0.0)
+        zz[mask] = zz[mask] + Lbox[2]
+        mask = (zz > Lbox[2])
+        zz[mask] = zz[mask] - Lbox[2]
+
+        if 'table' in kwargs.keys():
+            # assign satellite galaxy positions
+            try:
+                mask = (table['gal_type']=='satellites')
+            except KeyError:
+                mask = np.array([True]*len(table))
+                msg = ("`gal_type` not indicated in `table`.",
+                       "The orientation is being assigned for all galaxies in the `table`.")
+                print(msg)
+
+            table['x'] = halo_x*1.0
+            table['y'] = halo_y*1.0
+            table['z'] = halo_z*1.0
+
+            table['x'][mask] = xx[mask]
+            table['y'][mask] = yy[mask]
+            table['z'][mask] = zz[mask]
+
+            table['halo_x'][mask] = halo_x[mask]
+            table['halo_y'][mask] = halo_y[mask]
+            table['halo_z'][mask] = halo_z[mask]
+
+            return table
+        else:
+            x = xx
+            y = yy
+            z = zz
+            return np.vstack((x,y,z)).T
+
+    def assign_gal_type(self, **kwargs):
+        """
+        specify central and satellites
+        """
+
+        if 'table' in kwargs.keys():
+            table = kwargs['table']
+            upid = table['halo_upid']
+        else:
+            upid = kwargs['halo_upid']
+
+
+        centrals = (upid == -1)
+        satellites = (upid != -1)
+
+        if 'table' in kwargs.keys():
+            # assign galaxy type
+            table['gal_type'] = 'satellites'
+            table['gal_type'][centrals] = 'centrals'
+
+            return table
+        else:
+            result = np.array(['satellites']*len(upid))
+            result[centrals] = 'centrals'
+            return result
+
+    def anisotropy_bias_response(self, b_to_a, c_to_a):
+        """
+        return new axis ratios
+        """
+        beta = self.param_dict['anisotropy_bias']
+        return b_to_a**beta, c_to_a**beta
 
 
 

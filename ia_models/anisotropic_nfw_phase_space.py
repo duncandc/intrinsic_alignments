@@ -11,6 +11,9 @@ from halotools.utils import angles_between_list_of_vectors, vectors_normal_to_pl
 from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
 from halotools.mock_observables import relative_positions_and_velocities
 
+from rotations.mcrotations import random_unit_vectors_3d
+from rotations.rotations3d import rotation_matrices_from_basis
+
 
 __author__ = ['Andrew Hearin', 'Duncan Campbell']
 __all__ = ['AnisotropicNFWPhaseSpace', 'MonteCarloAnisotropicGalProf']
@@ -26,6 +29,150 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         """
 
         super(MonteCarloAnisotropicGalProf, self).__init__()
+
+    def mc_pos(self, *profile_params, **kwargs):
+        r""" Method to generate random, three-dimensional positions of galaxies.
+
+        Parameters
+        ----------
+        table : data table, optional
+            Astropy Table storing a length-Ngals galaxy catalog.
+            If ``table`` is not passed, ``profile_params`` and ``halo_radius`` must be passed.
+
+        *profile_params : Sequence of arrays
+            Sequence of length-Ngals array(s) containing the input profile parameter(s).
+            In the simplest case, this sequence has a single element,
+            e.g. a single array storing values of the NFW concentrations of the Ngals galaxies.
+            More generally, there should be a ``profile_params`` sequence item for
+            every parameter in the profile model, each item a length-Ngals array.
+            If ``profile_params`` is passed, ``halo_radius`` must be passed as a keyword argument.
+            The sequence must have the same order as ``self.gal_prof_param_keys``.
+
+        halo_radius : array_like, optional
+            Length-Ngals array storing the radial boundary of the halo
+            hosting each galaxy. Units assumed to be in Mpc/h.
+            If ``profile_params`` and ``halo_radius`` are not passed,
+            ``table`` must be passed.
+
+        overwrite_table_pos : bool, optional
+            If True, the `mc_pos` method will over-write the existing values of
+            the ``x``, ``y`` and ``z`` table columns. Default is True
+
+        return_pos : bool, optional
+            If True, method will return the computed host-centric
+            values of ``x``, ``y`` and ``z``. Default is False.
+
+        seed : int, optional
+            Random number seed used in the Monte Carlo realization.
+            Default is None, which will produce stochastic results.
+
+        Returns
+        -------
+        x, y, z : arrays, optional
+            For the case where no ``table`` is passed as an argument,
+            method will return x, y and z points distributed about the
+            origin according to the profile model.
+
+            For the case where ``table`` is passed as an argument
+            (this is the use case of populating halos with mock galaxies),
+            the ``x``, ``y``, and ``z`` columns of the table will be over-written.
+            When ``table`` is passed as an argument, the method
+            assumes that the ``x``, ``y``, and ``z`` columns already store
+            the position of the host halo center.
+
+        """
+        try:
+            overwrite_table_pos = kwargs['overwrite_table_pos']
+        except KeyError:
+            overwrite_table_pos = True
+
+        try:
+            return_pos = kwargs['return_pos']
+        except KeyError:
+            return_pos = False
+
+        if 'table' in kwargs:
+            table = kwargs['table']
+            x, y, z = self.mc_halo_centric_pos(*profile_params, **kwargs)
+            if x is None:
+                return None
+            if overwrite_table_pos is True:
+                table['x'][:] += x
+                table['y'][:] += y
+                table['z'][:] += z
+            if return_pos is True:
+                return x, y, z
+        else:
+            try:
+                halo_radius = np.atleast_1d(kwargs['halo_radius'])
+                assert len(halo_radius) == len(np.atleast_1d(profile_params[0]))
+            except KeyError:
+                raise HalotoolsError("\nIf not passing a ``table`` keyword argument "
+                    "to mc_pos, must pass the following keyword arguments:\n"
+                    "``profile_params``, ``halo_radius``.")
+            x, y, z = self.mc_halo_centric_pos(*profile_params, **kwargs)
+            if x is None:
+                return None
+            else:
+                return x, y, z
+
+    def mc_halo_centric_pos(self, *profile_params, **kwargs):
+        r""" Method to generate random, three-dimensional
+        halo-centric positions of galaxies.
+
+        Parameters
+        ----------
+        table : data table, optional
+            Astropy Table storing a length-Ngals galaxy catalog.
+            If ``table`` is not passed, ``profile_params`` and
+            keyword argument ``halo_radius`` must be passed.
+
+        *profile_params : Sequence of arrays
+            Sequence of length-Ngals array(s) containing the input profile parameter(s).
+            In the simplest case, this sequence has a single element,
+            e.g. a single array storing values of the NFW concentrations of the Ngals galaxies.
+            More generally, there should be a ``profile_params`` sequence item for
+            every parameter in the profile model, each item a length-Ngals array.
+            If ``profile_params`` is passed, ``halo_radius`` must be passed as a keyword argument.
+            The sequence must have the same order as ``self.gal_prof_param_keys``.
+
+        halo_radius : array_like, optional
+            Length-Ngals array storing the radial boundary of the halo
+            hosting each galaxy. Units assumed to be in Mpc/h.
+            If ``profile_params`` and ``halo_radius`` are not passed,
+            ``table`` must be passed.
+
+        seed : int, optional
+            Random number seed used in the Monte Carlo realization.
+            Default is None, which will produce stochastic results.
+
+        Returns
+        -------
+        x, y, z : arrays
+            Length-Ngals array storing a Monte Carlo realization of the galaxy positions.
+        """
+
+        x, y, z = self.mc_solid_sphere(*profile_params, **kwargs)
+        if x is None:
+            return None, None, None
+
+        # Retrieve the halo_radius
+        if 'table' in kwargs:
+            table = kwargs['table']
+            halo_radius = table[self.halo_boundary_key]
+        else:
+            try:
+                halo_radius = np.atleast_1d(kwargs['halo_radius'])
+            except KeyError:
+                raise HalotoolsError("If not passing an input ``table`` "
+                    "keyword argument to mc_halo_centric_pos,\n"
+                    "must pass the following keyword arguments:\n"
+                    "``halo_radius``, ``profile_params``.")
+
+        x *= halo_radius
+        y *= halo_radius
+        z *= halo_radius
+        return x, y, z
 
     def mc_unit_sphere(self, Npts, **kwargs):
         r"""
@@ -64,11 +211,20 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
                 halo_axisA_z = table['halo_axisA_z']
             except KeyError:
                 with NumpyRNGContext(seed):
-                    halo_axisA_x = np.random.random(len(table))*2-1
-                with NumpyRNGContext(seed+1):
-                    halo_axisA_y = np.random.random(len(table))*2-1
-                with NumpyRNGContext(seed+2):
-                    halo_axisA_z = np.random.random(len(table))*2-1
+                    v = random_unit_vectors_3d(len(table))
+                    halo_axisA_x = v[:,0]
+                    halo_axisA_y = v[:,1]
+                    halo_axisA_z = v[:,2]
+            try:
+                halo_axisC_x = table['halo_axisC_x']
+                halo_axisC_y = table['halo_axisC_y']
+                halo_axisC_z = table['halo_axisC_z']
+            except KeyError:
+                with NumpyRNGContext(seed):
+                    v = random_unit_vectors_3d(len(table))
+                    halo_axisC_x = v[:,0]
+                    halo_axisC_y = v[:,1]
+                    halo_axisC_z = v[:,2]
         else:
             try:
                 b_to_a = np.atleast_1d(kwargs['b_to_a'])
@@ -84,11 +240,24 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
                 halo_axisA_z = np.atleast_1d(kwargs['halo_axisA_z'])
             except KeyError:
                 with NumpyRNGContext(seed):
-                    halo_axisA_x = np.random.random(len(table))*2-1
-                with NumpyRNGContext(seed+1):
-                    halo_axisA_y = np.random.random(len(table))*2-1
-                with NumpyRNGContext(seed+2):
-                    halo_axisA_z = np.random.random(len(table))*2-1
+                    v = random_unit_vectors_3d(len(table))
+                    halo_axisC_x = v[:,0]
+                    halo_axisC_y = v[:,1]
+                    halo_axisC_z = v[:,2]
+            try:
+                halo_axisC_x = np.atleast_1d(kwargs['halo_axisC_x'])
+                halo_axisC_y = np.atleast_1d(kwargs['halo_axisC_y'])
+                halo_axisC_z = np.atleast_1d(kwargs['halo_axisC_z'])
+            except KeyError:
+                with NumpyRNGContext(seed):
+                    v = random_unit_vectors_3d(len(table))
+                    halo_axisC_x = v[:,0]
+                    halo_axisC_y = v[:,1]
+                    halo_axisC_z = v[:,2]
+
+        v1 = np.vstack((halo_axisA_x, halo_axisA_y, halo_axisA_z)).T
+        v3 = np.vstack((halo_axisC_x, halo_axisC_y, halo_axisC_z)).T
+        v2 = np.cross(v1,v3)
 
         with NumpyRNGContext(seed):
             phi = np.random.uniform(0, 2*np.pi, Npts)
@@ -96,6 +265,8 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
 
         cos_t = uran
         sin_t = np.sqrt((1.-cos_t*cos_t))
+
+        b_to_a, c_to_a = self.anisotropy_bias_response(b_to_a, c_to_a)
 
         c_to_b = c_to_a/b_to_a
 
@@ -106,14 +277,17 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         x_correlated_axes = np.vstack((x, y, z)).T
 
         x_axes = np.tile((1, 0, 0), Npts).reshape((Npts, 3))
-        major_axes = np.vstack((halo_axisA_x, halo_axisA_y, halo_axisA_z)).T
+        major_axes = v1
+
+        matrices = rotation_matrices_from_basis(v1,v2,v3)
 
         # rotate x-axis into the major axis
-        angles = angles_between_list_of_vectors(x_axes, major_axes)
-        rotation_axes = vectors_normal_to_planes(x_axes, major_axes)
-        matrices = rotation_matrices_from_angles(angles, rotation_axes)
+        #angles = angles_between_list_of_vectors(x_axes, major_axes)
+        #rotation_axes = vectors_normal_to_planes(x_axes, major_axes)
+        #matrices = rotation_matrices_from_angles(angles, rotation_axes)
 
         correlated_axes = rotate_vector_collection(matrices, x_correlated_axes)
+
         return correlated_axes[:, 0], correlated_axes[:, 1], correlated_axes[:, 2]
 
     def mc_solid_sphere(self, *profile_params, **kwargs):
@@ -176,6 +350,20 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         x *= dimensionless_radial_distance
         y *= dimensionless_radial_distance
         z *= dimensionless_radial_distance
+
+        b_to_a = table['halo_b_to_a']
+        c_to_a = table['halo_c_to_a']
+        
+        a = 1
+        b = b_to_a * a
+        c = c_to_a * a
+        T = (c**2-b**2)/(c**2-a**2)
+        q = b/a
+        s = c/a
+
+        x *= np.sqrt(q*s)
+        y *= np.sqrt(q*s)
+        z *= np.sqrt(q*s)
 
         # Assign the value of the host_centric_distance table column
         if 'table' in kwargs:
@@ -247,6 +435,31 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
 
         self.param_dict = ({
             'anisotropy_bias': anisotropy_bias})
+
+    def assign_phase_space(self, table, seed=None):
+        r""" Primary method of the `NFWPhaseSpace` class
+        called during the mock-population sequence.
+
+        Parameters
+        -----------
+        table : object
+            `~astropy.table.Table` storing halo catalog.
+
+            After calling the `assign_phase_space` method,
+            the `x`, `y`, `z`, `vx`, `vy`, and `vz`
+            columns of the input ``table`` will be over-written
+            with their host-centric values.
+
+        seed : int, optional
+            Random number seed used in the Monte Carlo realization.
+            Default is None, which will produce stochastic results.
+
+        """
+        self.mc_pos(self, table=table, seed=seed)
+        if seed is not None:
+            seed += 1
+        MonteCarloGalProf.mc_vel(self, table=table, seed=seed)
+
 
     def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4),
             conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
@@ -323,8 +536,11 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
 
         new_b_to_a, new_c_to_a = self.anisotropy_bias_response(b_to_a, c_to_a)
 
+        pribnt('here 1:')
         x, y, z = self.mc_halo_centric_pos(c,
-            halo_radius=rvir, b_to_a=new_b_to_a, c_to_a=new_c_to_a,
+            halo_radius=rvir,
+            b_to_a=new_b_to_a,
+            c_to_a=new_c_to_a,
             halo_axisA_x=halo_axisA_x,
             halo_axisA_y=halo_axisA_y,
             halo_axisA_z=halo_axisA_z, seed=seed)

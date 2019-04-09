@@ -66,7 +66,7 @@ def pbc_radial_vector(coords1, coords2, Lbox=None):
     if Lbox is None:
         Lbox = np.array([np.inf]*3)
     else:
-        Lbox = np.atleast_1D(Lbox)
+        Lbox = np.atleast_1d(Lbox)
 
     if len(Lbox)==1:
         Lbox = np.array([Lbox[0]]*3)
