@@ -109,7 +109,7 @@ def jackknife_ee_3d(sample1, orientations1, sample2, orientations2, rbins,
 
 def jackknife_ee_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
                                         coords_2, orientations_2, host_ids_2,
-                                        rbins, mask_1=None, mask_2=None,
+                                        rbins, mask1=None, mask2=None,
                                         period=None, num_threads=1,
                                         Nsub=[5, 5, 5], verbose=True):
     """
@@ -118,10 +118,10 @@ def jackknife_ee_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
     coords_1, coords_2, j_index_1, j_index_2, Nsub, N_sub_vol, Lbox, PBCs =\
         _process_args(coords_1, coords_2, period, Nsub)
 
-    if mask_1 is None:
-        mask_1 = np.array([True]*len(coords_1))
-    if mask_2 is None:
-        mask_2 = np.array([True]*len(coords_2))
+    if mask1 is None:
+        mask1 = np.array([True]*len(coords_1))
+    if mask2 is None:
+        mask2 = np.array([True]*len(coords_2))
 
     # loop through jackknife samples (note that zero is not used as a label)
     result_1h = np.zeros((N_sub_vol+1, len(rbins)-1))
@@ -140,8 +140,8 @@ def jackknife_ee_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
             orientations_2[j_mask_2],
             host_ids_2[j_mask_2],
             rbins,
-            mask1=mask_1[j_mask_1],
-            mask2=mask_2[j_mask_2],
+            mask1=mask1[j_mask_1],
+            mask2=mask2[j_mask_2],
             period=period, num_threads=num_threads)
 
         dt = time.time()-start
@@ -168,7 +168,7 @@ def jackknife_ee_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
 
 def jackknife_ed_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
                                         coords_2, host_ids_2,
-                                        rbins, mask_1=None, mask_2=None,
+                                        rbins, mask1=None, mask2=None,
                                         period=None, num_threads=1,
                                         Nsub=[5, 5, 5], verbose=True):
     """
@@ -177,10 +177,10 @@ def jackknife_ed_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
     coords_1, coords_2, j_index_1, j_index_2, Nsub, N_sub_vol, Lbox, PBCs =\
         _process_args(coords_1, coords_2, period, Nsub)
 
-    if mask_1 is None:
-        mask_1 = np.array([True]*len(coords_1))
-    if mask_2 is None:
-        mask_2 = np.array([True]*len(coords_2))
+    if mask1 is None:
+        mask1 = np.array([True]*len(coords_1))
+    if mask2 is None:
+        mask2 = np.array([True]*len(coords_2))
 
     # loop through jackknife samples (note that zero is not used as a label)
     result_1h = np.zeros((N_sub_vol+1, len(rbins)-1))
@@ -198,8 +198,8 @@ def jackknife_ed_3d_one_two_halo_decomp(coords_1, orientations_1, host_ids_1,
             coords_2[j_mask_2],
             host_ids_2[j_mask_2],
             rbins,
-            mask1=mask_1[j_mask_1],
-            mask2=mask_2[j_mask_2],
+            mask1=mask1[j_mask_1],
+            mask2=mask2[j_mask_2],
             period=period, num_threads=num_threads)
 
         dt = time.time()-start

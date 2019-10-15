@@ -5,6 +5,7 @@ import numpy as np
 from halotools.sim_manager import CachedHaloCatalog
 from halotools.utils import crossmatch, normalized_vectors, angles_between_list_of_vectors
 from halotools.mock_observables import relative_positions_and_velocities
+from astropy.table import Table
 
 
 __all__=['load_value_added_halocat', 'halocat_to_galaxy_table']
@@ -85,9 +86,9 @@ def load_value_added_halocat(simname='bolplanck', redshift=0.0, version_name='ha
 
 def halocat_to_galaxy_table(halocat):
     """
-    transform a Halotools halocat.halo_table into a 
+    transform a Halotools halocat.halo_table into a
     test galaxy_table object, used for testing model componenets
-    
+
     Returns
     -------
     galaxy_table : astropy.table object
@@ -99,7 +100,7 @@ def halocat_to_galaxy_table(halocat):
 
     # create galaxy table
     table = Table([halo_id, halo_upid, host_id], names=('halo_id', 'halo_upid', 'halo_hostid'))
-    
+
     # add position information
     table['x'] = halocat.halo_table['halo_x']
     table['y'] = halocat.halo_table['halo_y']
@@ -107,7 +108,7 @@ def halocat_to_galaxy_table(halocat):
     table['vx'] = halocat.halo_table['halo_vx']
     table['vy'] = halocat.halo_table['halo_vy']
     table['vz'] = halocat.halo_table['halo_vz']
-    
+
     # add halo mass
     table['halo_mpeak'] = halocat.halo_table['halo_mpeak']
 
@@ -134,7 +135,7 @@ def halocat_to_galaxy_table(halocat):
 
     # host halo properties
     inds1, inds2 = crossmatch(halocat.halo_table['halo_hostid'], halocat.halo_table['halo_id'])
-    
+
     # host halo position
     table['halo_x'] = 0.0
     table['halo_x'][inds1] = halocat.halo_table['halo_x'][inds2]
@@ -142,7 +143,7 @@ def halocat_to_galaxy_table(halocat):
     table['halo_y'][inds1] = halocat.halo_table['halo_y'][inds2]
     table['halo_z'] = 0.0
     table['halo_z'][inds1] = halocat.halo_table['halo_z'][inds2]
-    
+
     # host haloo mass
     table['halo_mvir'] = 0.0
     table['halo_mvir'][inds1] = halocat.halo_table['halo_mvir'][inds2]
@@ -150,12 +151,16 @@ def halocat_to_galaxy_table(halocat):
     table['halo_rvir'][inds1] = halocat.halo_table['halo_rvir'][inds2]
 
     # assign orientations
-    table['halo_axisA_x'] = 0.0
-    table['halo_axisA_x'][inds1] = halocat.halo_table['halo_axisA_x'][inds2]
-    table['halo_axisA_y'] = 0.0
-    table['halo_axisA_y'][inds1] = halocat.halo_table['halo_axisA_y'][inds2]
-    table['halo_axisA_z'] = 0.0
-    table['halo_axisA_z'][inds1] = halocat.halo_table['halo_axisA_z'][inds2]
+    #table['halo_axisA_x'] = 0.0
+    #table['halo_axisA_x'][inds1] = halocat.halo_table['halo_axisA_x'][inds2]
+    #table['halo_axisA_y'] = 0.0
+    #table['halo_axisA_y'][inds1] = halocat.halo_table['halo_axisA_y'][inds2]
+    #table['halo_axisA_z'] = 0.0
+    #table['halo_axisA_z'][inds1] = halocat.halo_table['halo_axisA_z'][inds2]
+
+    table['halo_axisA_x'] = halocat.halo_table['halo_axisA_x']
+    table['halo_axisA_y'] = halocat.halo_table['halo_axisA_y']
+    table['halo_axisA_z'] = halocat.halo_table['halo_axisA_z']
 
     return table
 

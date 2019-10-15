@@ -240,7 +240,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
                 halo_axisA_z = np.atleast_1d(kwargs['halo_axisA_z'])
             except KeyError:
                 with NumpyRNGContext(seed):
-                    v = random_unit_vectors_3d(len(table))
+                    v = random_unit_vectors_3d(1)
                     halo_axisC_x = v[:,0]
                     halo_axisC_y = v[:,1]
                     halo_axisC_z = v[:,2]
@@ -250,7 +250,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
                 halo_axisC_z = np.atleast_1d(kwargs['halo_axisC_z'])
             except KeyError:
                 with NumpyRNGContext(seed):
-                    v = random_unit_vectors_3d(len(table))
+                    v = random_unit_vectors_3d(len(halo_axisA_x))
                     halo_axisC_x = v[:,0]
                     halo_axisC_y = v[:,1]
                     halo_axisC_z = v[:,2]
@@ -287,6 +287,7 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         #matrices = rotation_matrices_from_angles(angles, rotation_axes)
 
         correlated_axes = rotate_vector_collection(matrices, x_correlated_axes)
+        #correlated_axes = x_correlated_axes
 
         return correlated_axes[:, 0], correlated_axes[:, 1], correlated_axes[:, 2]
 
@@ -324,6 +325,8 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
             profile_params = ([table[profile_param_key]
                 for profile_param_key in self.gal_prof_param_keys])
             halo_radius = table[self.halo_boundary_key]
+            b_to_a = table['halo_b_to_a']
+            c_to_a = table['halo_c_to_a']
         else:
             try:
                 assert len(profile_params) > 0
@@ -331,6 +334,9 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
                 raise ValueError("If not passing an input ``table`` "
                     "keyword argument to mc_solid_sphere,\n"
                     "must pass a ``profile_params`` keyword argument")
+
+            b_to_a = kwargs['b_to_a']
+            c_to_a = kwargs['c_to_a']
 
         # get random angles
         Ngals = len(np.atleast_1d(profile_params[0]))
@@ -351,9 +357,6 @@ class MonteCarloAnisotropicGalProf(MonteCarloGalProf):
         y *= dimensionless_radial_distance
         z *= dimensionless_radial_distance
 
-        b_to_a = table['halo_b_to_a']
-        c_to_a = table['halo_c_to_a']
-        
         a = 1
         b = b_to_a * a
         c = c_to_a * a
@@ -463,7 +466,9 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
 
     def mc_generate_nfw_phase_space_points(self, Ngals=int(1e4),
             conc=5, mass=1e12, b_to_a=0.7, c_to_a=0.5,
-            halo_axisA_x=0.0, halo_axisA_y=0.0, halo_axisA_z=1.0, verbose=True, seed=None):
+            halo_axisA_x=1.0, halo_axisA_y=0.0, halo_axisA_z=0.0,
+            halo_axisC_x=1.0, halo_axisC_y=0.0, halo_axisC_z=0.0,
+             verbose=True, seed=None):
         r""" Return a Monte Carlo realization of points
         in the phase space of an NFW halo in isotropic Jeans equilibrium.
 
@@ -531,19 +536,26 @@ class AnisotropicNFWPhaseSpace(MonteCarloAnisotropicGalProf, NFWPhaseSpace):
         halo_axisA_x = np.zeros(Ngals) + halo_axisA_x
         halo_axisA_y = np.zeros(Ngals) + halo_axisA_y
         halo_axisA_z = np.zeros(Ngals) + halo_axisA_z
+        halo_axisC_x = np.zeros(Ngals) + halo_axisC_x
+        halo_axisC_y = np.zeros(Ngals) + halo_axisC_y
+        halo_axisC_z = np.zeros(Ngals) + halo_axisC_z
         rvir = NFWProfile.halo_mass_to_halo_radius(self, total_mass=m)
 
 
         new_b_to_a, new_c_to_a = self.anisotropy_bias_response(b_to_a, c_to_a)
 
-        pribnt('here 1:')
+        print('here 1:')
         x, y, z = self.mc_halo_centric_pos(c,
             halo_radius=rvir,
             b_to_a=new_b_to_a,
             c_to_a=new_c_to_a,
             halo_axisA_x=halo_axisA_x,
             halo_axisA_y=halo_axisA_y,
-            halo_axisA_z=halo_axisA_z, seed=seed)
+            halo_axisA_z=halo_axisA_z,
+            halo_axisC_x=halo_axisC_x,
+            halo_axisC_y=halo_axisC_y,
+            halo_axisC_z=halo_axisC_z,
+            seed=seed)
         r = np.sqrt(x**2 + y**2 + z**2)
         scaled_radius = r/rvir
 

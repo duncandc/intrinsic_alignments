@@ -424,14 +424,15 @@ class SemiIsotropicSubhaloPositions():
 
 class TriaxialNFW():
     """
-    galaxy occupation model that places centrals and satellites in haloes and isotropized sub-haloes
+    galaxy occupation model that places centrals and satellites in haloes and re-positioned sub-haloes
     """
 
     def __init__(self, anisotropy_bias=1.0, **kwargs):
 
         self._mock_generation_calling_sequence = ['assign_gal_type', 'assign_positions']
         self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'string'),
-                                                     (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4')])
+                                                     (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4'),
+                                                     (str('r'), 'f4')])
         self.list_of_haloprops_needed = ['halo_upid', 'halo_x', 'halo_y', 'halo_z', 'halo_hostid',
                                          'halo_axisA_x','halo_axisA_y','halo_axisA_z',
                                          'halo_axisC_x','halo_axisC_y','halo_axisC_z',
@@ -507,10 +508,16 @@ class TriaxialNFW():
         # get host halo properties
         inds1, inds2 = crossmatch(halo_hostid, halo_id)
 
+        # some sub-haloes point to a host that does not exist
+        no_host = ~np.in1d(halo_hostid, halo_id)
+        if np.sum(no_host)>0:
+            msg = ("There are {0} sub-haloes with no host halo.".format(np.sum(no_host)))
+            warn(msg)
+
         host_halo_concentration = np.zeros(Npts)
         host_halo_concentration[inds1] = concentration[inds2]
 
-        host_halo_rvir = np.zeros(Npts) 
+        host_halo_rvir = np.zeros(Npts)
         host_halo_rvir[inds1] = rvir[inds2]
 
         host_b_to_a = np.zeros(Npts)
@@ -570,7 +577,7 @@ class TriaxialNFW():
 
         x *= dimensionless_radial_distance
         y *= dimensionless_radial_distance
-        z *= dimensionless_radial_distance 
+        z *= dimensionless_radial_distance
 
         x *= host_halo_rvir
         y *= host_halo_rvir
@@ -587,24 +594,20 @@ class TriaxialNFW():
         y *= np.sqrt(q*s)
         z *= np.sqrt(q*s)
 
+        # host-halo centric radial distance
+        r = np.sqrt(x*x + y*y + z*z)
+
         # move back into original cordinate system
         xx = halo_x + x
         yy = halo_y + y
         zz = halo_z + z
 
+        xx[no_host] = halo_x[no_host]
+        yy[no_host] = halo_y[no_host]
+        zz[no_host] = halo_z[no_host]
+
         # account for PBCs
-        mask = (xx < 0.0)
-        xx[mask] = xx[mask] + Lbox[0]
-        mask = (xx > Lbox[0])
-        xx[mask] = xx[mask] - Lbox[0]
-        mask = (yy < 0.0)
-        yy[mask] = yy[mask] + Lbox[1]
-        mask = (yy > Lbox[1])
-        yy[mask] = yy[mask] - Lbox[1]
-        mask = (zz < 0.0)
-        zz[mask] = zz[mask] + Lbox[2]
-        mask = (zz > Lbox[2])
-        zz[mask] = zz[mask] - Lbox[2]
+        xx, yy, zz = wrap_coordinates(xx, yy, zz, Lbox)
 
         if 'table' in kwargs.keys():
             # assign satellite galaxy positions
@@ -623,6 +626,9 @@ class TriaxialNFW():
             table['x'][mask] = xx[mask]
             table['y'][mask] = yy[mask]
             table['z'][mask] = zz[mask]
+
+            table['r'] = 0.0
+            table['r'][mask] = r[mask]
 
             table['halo_x'][mask] = halo_x[mask]
             table['halo_y'][mask] = halo_y[mask]
@@ -669,31 +675,53 @@ class TriaxialNFW():
         return b_to_a**beta, c_to_a**beta
 
 
+def wrap_coordinates(x, y, z, Lbox):
+    """
+    account for periodic boundary conditions
+    """
+
+    mask = (x < 0.0)
+    x[mask] = x[mask] + Lbox[0]
+    mask = (x > Lbox[0])
+    x[mask] = x[mask] - Lbox[0]
+
+    mask = (y < 0.0)
+    y[mask] = y[mask] + Lbox[1]
+    mask = (y > Lbox[1])
+    y[mask] = y[mask] - Lbox[1]
+
+    mask = (z < 0.0)
+    z[mask] = z[mask] + Lbox[2]
+    mask = (z > Lbox[2])
+    z[mask] = z[mask] - Lbox[2]
+
+    return x, y, z
+
 
 def radial_distance(x, y, z, halo_x, halo_y, halo_z, Lbox):
-        """
-        calculate radial position of satellite galaxies
-        """
+    """
+    calculate radial vector and distance of satellite galaxies
+    """
 
-        dx = (x - halo_x)
-        mask = dx>Lbox[0]/2.0
-        dx[mask] = dx[mask] - Lbox[0]
-        mask = dx<-1.0*Lbox[0]/2.0
-        dx[mask] = dx[mask] + Lbox[0]
+    dx = (x - halo_x)
+    mask = dx>Lbox[0]/2.0
+    dx[mask] = dx[mask] - Lbox[0]
+    mask = dx<-1.0*Lbox[0]/2.0
+    dx[mask] = dx[mask] + Lbox[0]
 
-        dy = (y - halo_y)
-        mask = dy>Lbox[1]/2.0
-        dy[mask] = dy[mask] - Lbox[1]
-        mask = dy<-1.0*Lbox[1]/2.0
-        dy[mask] = dy[mask] + Lbox[1]
+    dy = (y - halo_y)
+    mask = dy>Lbox[1]/2.0
+    dy[mask] = dy[mask] - Lbox[1]
+    mask = dy<-1.0*Lbox[1]/2.0
+    dy[mask] = dy[mask] + Lbox[1]
 
-        dz = (z - halo_z)
-        mask = dz>Lbox[2]/2.0
-        dz[mask] = dz[mask] - Lbox[2]
-        mask = dz<-1.0*Lbox[2]/2.0
-        dz[mask] = dz[mask] + Lbox[2]
+    dz = (z - halo_z)
+    mask = dz>Lbox[2]/2.0
+    dz[mask] = dz[mask] - Lbox[2]
+    mask = dz<-1.0*Lbox[2]/2.0
+    dz[mask] = dz[mask] + Lbox[2]
 
-        r = np.sqrt(dx**2+dy**2+dz**2)
+    r = np.sqrt(dx**2+dy**2+dz**2)
 
-        return np.vstack((dx, dy, dz)).T, r
+    return np.vstack((dx, dy, dz)).T, r
 
