@@ -8,8 +8,11 @@ from __future__ import (absolute_import, division, print_function,
 
 import numpy as np
 import time
-from halotools.mock_observables.alignments import ed_3d, ee_3d
-from halotools.mock_observables.alignments import (ee_3d_one_two_halo_decomp,
+#from halotools.mock_observables.alignments import ed_3d, ee_3d
+#from halotools.mock_observables.alignments import (ee_3d_one_two_halo_decomp,
+#                                                   ed_3d_one_two_halo_decomp)
+from halotools_ia.correlation_functions import ed_3d, ee_3d
+from halotools_ia.correlation_functions import (ee_3d_one_two_halo_decomp,
                                                    ed_3d_one_two_halo_decomp)
 from halotools.mock_observables.catalog_analysis_helpers import cuboid_subvolume_labels
 from halotools.custom_exceptions import HalotoolsError
