@@ -13,7 +13,7 @@ from rotations.vector_utilities import (elementwise_dot, elementwise_norm, norma
 from rotations.rotations3d import (vectors_between_list_of_vectors, vectors_normal_to_planes,
                                    rotation_matrices_from_angles)
 # watson distribution
-from watson_distribution import DimrothWatson
+from watson_dist import DimrothWatson
 
 # utilities
 from warnings import warn
