@@ -7,7 +7,7 @@ import numpy as np
 from astropy.utils.misc import NumpyRNGContext
 from warnings import warn
 from halotools.utils import crossmatch
-from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
+from halotools.utils.rotations3d import rotation_matrices_from_angles, rotate_vector_collection
 
 from halotools.empirical_models import NFWPhaseSpace
 from rotations.rotations3d import rotation_matrices_from_basis
