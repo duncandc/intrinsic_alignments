@@ -24,14 +24,16 @@ I am currently working on simplifying the installation process for rotations.
 Conda install is available for all except the specific version of halotools, rotations, and watson_dist. To install these from github using conda, do the following:
 * conda install git
 * conda install pip
-* To install rotations you need a setup.py file, currently working on that
+* To install rotations:
+  * Activate your conda environment
+  * Run: pip install git+https://github.com/nvanalfen/rotations
 * To install the proper fork of halotools:
-*   Make sure you have gcc version 5.3 or later. This is very important. The newest version will be the best option.
-*   Activate your conda environment
-*   Within your environment, run: pip install git+https://github.com/duncandc/halotools@alignments_devel
+  * Make sure you have gcc version 5.3 or later. This is very important. The newest version will be the best option.
+  * Activate your conda environment
+  * Within your environment, run: pip install git+https://github.com/duncandc/halotools@alignments_devel
 * To install watson_dist there are several options:
-*   Run: pip install git+https://github.com/duncandc/watson_dist
-*   OR clone the repo and in the directory with setup.py and run: conda develop .
+  * Run: pip install git+https://github.com/duncandc/watson_dist
+  * OR clone the repo and in the directory with setup.py and run: conda develop .
 
 Alignment correlation functions are in development in Duncan's personal halotools fork in a dedicated [branch](https://github.com/duncandc/halotools/tree/alignments_devel).  In addition to Duncan, this branch has contributions by:
 
