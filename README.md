@@ -13,7 +13,7 @@ This project requires the following Python packages be installed:
 * [scipy](https://www.scipy.org)
 * [astropy](http://www.astropy.org)
 * The alignments_devel branch of Duncan's fork of [halotools](https://github.com/duncandc/halotools)
-* My fork of [rotations](https://github.com/nvanalfen/rotations) currently only the test branch is updated
+* My fork of [rotations](https://github.com/nvanalfen/rotations)
 * [watson_dist](https://github.com/duncandc/watson_dist)
 
 
