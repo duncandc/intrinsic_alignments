@@ -7,7 +7,8 @@ import numpy as np
 from astropy.utils.misc import NumpyRNGContext
 from warnings import warn
 from halotools.utils import crossmatch
-from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
+#from halotools.utils.rotations3d import rotation_matrices_from_angles, rotate_vector_collection
+from rotations import rotation_matrices_from_angles, rotate_vector_collection
 
 from halotools.empirical_models import NFWPhaseSpace
 from rotations.rotations3d import rotation_matrices_from_basis
@@ -18,16 +19,15 @@ __author__ = ('Duncan Campbell')
 
 class SubHaloPositions():
     """
-	galaxy occupation model that places centrals and satellites in haloes and sub-haloes
-	"""
+    galaxy occupation model that places centrals and satellites in haloes and sub-haloes
+    """
 
     def __init__(self):
         """
 
         """
         self._mock_generation_calling_sequence = ['assign_gal_type', 'assign_positions']
-        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'string'),
-                                                     (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4')])
+        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'str'), (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4')])
         self.list_of_haloprops_needed = ['halo_upid', 'halo_hostid', 'halo_id', 'halo_x', 'halo_y', 'halo_z']
 
     def assign_positions(self, **kwargs):
@@ -100,12 +100,12 @@ class SubHaloPositions():
 class IsotropicSubhaloPositions():
     """
     galaxy occupation model that places centrals and satellites in haloes and isotropized sub-haloes
-	"""
+    """
 
     def __init__(self, **kwargs):
 
         self._mock_generation_calling_sequence = ['assign_gal_type', 'assign_positions']
-        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'string'),
+        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'str'),
                                                      (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4')])
         self.list_of_haloprops_needed = ['halo_upid', 'halo_x', 'halo_y', 'halo_z', 'halo_hostid']
 
@@ -127,7 +127,7 @@ class IsotropicSubhaloPositions():
     def assign_positions(self, **kwargs):
         """
         assign satellite positions based on subhalo radial positions and random angular positions.
-    	"""
+        """
 
         if 'table' in kwargs.keys():
             table = kwargs['table']
@@ -227,9 +227,9 @@ class IsotropicSubhaloPositions():
             return np.vstack((x,y,z)).T
 
     def assign_gal_type(self, **kwargs):
-    	"""
+        """
         specify central and satellites
-    	"""
+        """
 
         if 'table' in kwargs.keys():
             table = kwargs['table']
@@ -261,7 +261,7 @@ class SemiIsotropicSubhaloPositions():
     def __init__(self, **kwargs):
 
         self._mock_generation_calling_sequence = ['assign_gal_type', 'assign_positions']
-        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'string'),
+        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'str'),
                                                      (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4')])
         self.list_of_haloprops_needed = ['halo_upid', 'halo_x', 'halo_y', 'halo_z', 'halo_hostid', 'halo_axisA_x', 'halo_axisA_y', 'halo_axisA_z']
 
@@ -430,7 +430,7 @@ class TriaxialNFW():
     def __init__(self, anisotropy_bias=1.0, **kwargs):
 
         self._mock_generation_calling_sequence = ['assign_gal_type', 'assign_positions']
-        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'string'),
+        self._galprop_dtypes_to_allocate = np.dtype([(str('gal_type'), 'str'),
                                                      (str('x'), 'f4'), (str('y'), 'f4'), (str('z'), 'f4'),
                                                      (str('r'), 'f4')])
         self.list_of_haloprops_needed = ['halo_upid', 'halo_x', 'halo_y', 'halo_z', 'halo_hostid',
