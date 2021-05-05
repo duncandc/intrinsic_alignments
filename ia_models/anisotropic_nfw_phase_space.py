@@ -7,8 +7,10 @@ from astropy.table import Table
 from astropy.utils.misc import NumpyRNGContext
 
 from halotools.empirical_models import NFWProfile, MonteCarloGalProf, NFWPhaseSpace
-from halotools.utils import angles_between_list_of_vectors, vectors_normal_to_planes
-from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
+#from halotools.utils import angles_between_list_of_vectors, vectors_normal_to_planes
+#from halotools.utils import rotation_matrices_from_angles, rotate_vector_collection
+from rotations import angles_between_list_of_vectors, vectors_normal_to_planes
+from rotations import rotation_matrices_from_angles, rotate_vector_collection
 from halotools.mock_observables import relative_positions_and_velocities
 
 from rotations.mcrotations import random_unit_vectors_3d
