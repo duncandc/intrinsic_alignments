@@ -1216,8 +1216,8 @@ def alignment_strength(p):
 
     p = np.atleast_1d(p)
     k = np.zeros(len(p))
-    p = p*np.pi/2.0
-    k = np.tan(p)
+    p_rescale = p*np.pi/2.0
+    k = np.tan(p_rescale)
     mask = (p == 1.0)
     k[mask] = np.inf
     mask = (p == -1.0)
